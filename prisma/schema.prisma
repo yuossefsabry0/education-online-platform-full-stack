@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionDuration {
+  ONE_MONTH
+  THREE_MONTHS
+  SIX_MONTHS
+  ONE_YEAR
+}
+
+enum TeacherContentType {
+  LECTURE
+  LESSON_CONTENT
+  HOMEWORK
+}
+
+enum ActorType {
+  STUDENT
+  TEACHER
+  ADMIN
+  SYSTEM
+}
+
+enum TokenOwnerType {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+
+// Students (regular users) — separate table from Teachers
+
+model Student {
+  id            Int            @id @default(autoincrement())
+  name          String
+  username      String         @unique
+  email         String         @unique @db.VarChar(254)
+  password      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+  refreshTokens RefreshToken[]
+}
+
+
+// Teachers — separate table from Students
+
+
+model Teacher {
+  id           Int                @id @default(autoincrement())
+  name         String
+  username     String             @unique
+  email        String             @unique @db.VarChar(254)
+  password     String
+  subject      String
+  gradeClass   String
+  // 4 subscription duration prices (stored as data, easy to change per teacher)
+  price1Month  Decimal            @db.Decimal(10, 2)
+  price3Months Decimal            @db.Decimal(10, 2)
+  price6Months Decimal            @db.Decimal(10, 2)
+  price1Year   Decimal            @db.Decimal(10, 2)
+  // Soft-delete flag (mark deleted/inactive without removing the row)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  subscriptions Subscription[]
+  contents     TeacherContent[]
+  refreshTokens RefreshToken[]
+}
+
+// Admin — its own separate table (seeded directly, no public route)
+
+
+model Admin {
+  id            Int            @id @default(autoincrement())
+  username      String         @unique
+  email         String         @unique @db.VarChar(254)
+  password      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  refreshTokens RefreshToken[]
+}
+
+
+// Subscriptions — userId + teacherId + price SNAPSHOT + status
+
+
+model Subscription {
+  id         Int                  @id @default(autoincrement())
+  studentId  Int
+  teacherId  Int
+  // Dynamic role identifier derived from the teacher's id (role = "SUB" + teacherId).
+  // Not a hardcoded/enum list — adding a teacher automatically yields its role.
+  teacherRole String
+  duration   SubscriptionDuration
+  // Fixed price snapshot recorded at purchase time; never overwritten later.
+  price      Decimal              @db.Decimal(10, 2)
+  startDate  DateTime
+  endDate    DateTime
+  status     SubscriptionStatus   @default(ACTIVE)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  // Fix Task 5: generated VIRTUAL column that evaluates to teacherId when
+  // status = 'ACTIVE' and to NULL otherwise. It backs the unique index
+  // (studentId, activeSubscriptionKey) that enforces at most one ACTIVE
+  // subscription per (student, teacher) pair at the database level (MySQL has
+  // no partial/conditional unique indexes). The column is created and managed
+  // only by the migration's raw SQL — Prisma treats it via Unsupported so a
+  // future `prisma migrate dev` will not see it as drift. Application code
+  // never reads or writes this field.
+  activeSubscriptionKey Unsupported("int")?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, activeSubscriptionKey])
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([status])
+}
+
+
+// Per-teacher content (Lectures, Lesson Content, Homework)
+
+
+model TeacherContent {
+  id         Int                @id @default(autoincrement())
+  teacherId  Int
+  type       TeacherContentType
+  title      String         @db.VarChar(255)
+  body       String?        @db.LongText
+  fileUrl    String?        @db.VarChar(500)
+  isPublished Boolean           @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([type])
+}
+
+
+// Refresh Tokens — per-user revocable tokens (student/teacher/admin)
+
+
+model RefreshToken {
+  id        Int            @id @default(autoincrement())
+  token     String         @unique
+  ownerType TokenOwnerType
+  studentId Int?
+  teacherId Int?
+  adminId   Int?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime       @default(now())
+
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  admin   Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([ownerType, studentId])
+  @@index([ownerType, teacherId])
+  @@index([ownerType, adminId])
+}
+
+
+// Log History — generic, flexible event log (written by later tasks,
+// read/displayed by the admin's Log History route)
+
+
+model LogHistory {
+  id         Int      @id @default(autoincrement())
+  actionType String
+  // Who performed the action: student/teacher/admin/system (optional row id)
+  actorId    String?
+  actorType  ActorType
+  // The entity the action relates to (teacher id, subscription id, content id, ...)
+  targetId   String?
+  timestamp  DateTime @default(now())
+  // Optional extra context, e.g. JSON
+  details    Json?
+
+  @@index([actionType])
+  @@index([actorType])
+  @@index([targetId])
+  @@index([timestamp])
+}

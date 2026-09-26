@@ -1,0 +1,560 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Education System API",
+    "version": "1.0.0",
+    "description": "Backend API for the Education System project. All responses use the wrapper `{ success, data, error }`. Success: `success: true`, `data: <payload>`, `error: null`. Failure: `success: false`, `data: null`, `error: { code, message, details }`."
+  },
+  "servers": [
+    { "url": "{{BASE_URL}}/api", "description": "Uses the BASE_URL Postman variable (local/staging/production)" },
+    { "url": "http://localhost:5000/api", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Health" },
+    { "name": "Auth" },
+    { "name": "Contact" },
+    { "name": "Teachers" },
+    { "name": "User" },
+    { "name": "Subscriptions" },
+    { "name": "Content" },
+    { "name": "Teacher Dashboard" },
+    { "name": "Admin" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data": { "type": "object", "nullable": true },
+          "error": { "type": "null", "example": null }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "data": { "type": "null", "example": null },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "details": { "type": "object", "nullable": true }
+            }
+          }
+        }
+      },
+      "RegisterStudent": {
+        "type": "object",
+        "required": ["name", "username", "email", "password"],
+        "properties": {
+          "name": { "type": "string", "example": "John Doe" },
+          "username": { "type": "string", "example": "john_doe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "password": { "type": "string", "format": "password", "minLength": 6 }
+        }
+      },
+      "Login": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string" },
+          "userType": {
+            "type": "string",
+            "enum": ["student", "teacher", "admin"],
+            "description": "Optional. When omitted, the server resolves the account by username; required only when the username exists in more than one account table."
+          }
+        }
+      },
+      "RefreshToken": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": { "type": "string" }
+        }
+      },
+      "ConfirmPayment": {
+        "type": "object",
+        "required": ["teacherId", "duration"],
+        "properties": {
+          "teacherId": { "type": "integer", "example": 1 },
+          "duration": {
+            "type": "string",
+            "enum": ["ONE_MONTH", "THREE_MONTHS", "SIX_MONTHS", "ONE_YEAR"]
+          }
+        }
+      },
+      "AddTeacher": {
+        "type": "object",
+        "required": ["name", "username", "email", "password", "subject", "gradeClass", "price1Month", "price3Months", "price6Months", "price1Year"],
+        "properties": {
+          "name": { "type": "string", "example": "New Teacher" },
+          "username": { "type": "string", "example": "new_teacher" },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "format": "password", "minLength": 6 },
+          "subject": { "type": "string", "example": "Math" },
+          "gradeClass": { "type": "string", "example": "2nd year secondary grade" },
+          "price1Month": { "type": "number", "example": 60 },
+          "price3Months": { "type": "number", "example": 162 },
+          "price6Months": { "type": "number", "example": 300 },
+          "price1Year": { "type": "number", "example": 540 }
+        }
+      },
+      "EditTeacher": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "format": "password", "minLength": 6 },
+          "subject": { "type": "string" },
+          "gradeClass": { "type": "string" },
+          "price1Month": { "type": "number" },
+          "price3Months": { "type": "number" },
+          "price6Months": { "type": "number" },
+          "price1Year": { "type": "number" }
+        }
+      },
+      "AddContent": {
+        "type": "object",
+        "required": ["type", "title"],
+        "properties": {
+          "type": { "type": "string", "enum": ["LECTURE", "LESSON_CONTENT", "HOMEWORK"] },
+          "title": { "type": "string", "example": "Algebra basics" },
+          "body": { "type": "string", "nullable": true },
+          "fileUrl": { "type": "string", "nullable": true },
+          "isPublished": { "type": "boolean", "default": true }
+        }
+      },
+      "EditContent": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["LECTURE", "LESSON_CONTENT", "HOMEWORK"] },
+          "title": { "type": "string" },
+          "body": { "type": "string", "nullable": true },
+          "fileUrl": { "type": "string", "nullable": true },
+          "isPublished": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Server is alive",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Success" } } }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new student (strict rate limited)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterStudent" } } }
+        },
+        "responses": {
+          "201": { "description": "Student created" },
+          "400": { "description": "Validation failed" },
+          "409": { "description": "Username/email already in use" },
+          "429": { "description": "Too many requests" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login for students, teachers and admin (strict rate limited)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Login" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns access token, refresh token and profile"
+          },
+          "400": { "description": "Validation failed" },
+          "401": { "description": "Invalid credentials" },
+          "404": { "description": "Teacher account is inactive" },
+          "409": { "description": "Username exists in more than one account table; resubmit with userType" },
+          "429": { "description": "Too many attempts" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Exchange a refresh token for a new access token",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshToken" } } }
+        },
+        "responses": {
+          "200": { "description": "New access token" },
+          "400": { "description": "Missing refresh token" },
+          "401": { "description": "Invalid/revoked/expired token" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Revoke a refresh token",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshToken" } } }
+        },
+        "responses": {
+          "200": { "description": "Logged out" },
+          "400": { "description": "Invalid or already revoked" }
+        }
+      }
+    },
+    "/contact": {
+      "get": {
+        "tags": ["Contact"],
+        "summary": "Contact information",
+        "responses": {
+          "200": { "description": "Contact email" }
+        }
+      }
+    },
+    "/teachers": {
+      "get": {
+        "tags": ["Teachers"],
+        "summary": "List teachers (public sees limited fields; admin sees full data with prices)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 }, "description": "Items per page" },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["id", "name", "subject", "gradeClass", "username", "email", "createdAt", "updatedAt"] } },
+          { "name": "sortOrder", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } }
+        ],
+        "responses": { "200": { "description": "Paginated teacher list" } }
+      }
+    },
+    "/teachers/search": {
+      "get": {
+        "tags": ["Teachers"],
+        "summary": "Search teachers by name (with fuzzy fallback)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortOrder", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Paginated search results" } }
+      }
+    },
+    "/teachers/{teacherId}/content": {
+      "get": {
+        "tags": ["Teachers"],
+        "summary": "Published content of a teacher (requires active subscription to that teacher)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Content list" },
+          "403": { "description": "No active subscription for this teacher" }
+        }
+      }
+    },
+    "/user/me": {
+      "get": {
+        "tags": ["User"],
+        "summary": "Current user profile plus their active subscription roles",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Profile and activeRoles" } }
+      }
+    },
+    "/subscriptions/teacher/{teacherId}": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "summary": "Subscription plans/prices for one teacher (student only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Plans and active subscription info" } }
+      }
+    },
+    "/subscriptions/confirm-payment": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "summary": "Confirm payment and activate a subscription (student only)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmPayment" } } }
+        },
+        "responses": {
+          "201": { "description": "Subscription activated" },
+          "403": { "description": "Not a student" },
+          "404": { "description": "Teacher not found" },
+          "409": { "description": "Already has an active subscription" }
+        }
+      }
+    },
+    "/content/teacher/{teacherId}": {
+      "get": {
+        "tags": ["Content"],
+        "summary": "Teacher content page (requires active subscription role SUB{teacherId})",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Content page with sections" },
+          "403": { "description": "Subscription required" }
+        }
+      }
+    },
+    "/content/teacher/{teacherId}/{section}": {
+      "get": {
+        "tags": ["Content"],
+        "summary": "One content section (lectures | lesson-content | homework)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "section", "in": "path", "required": true, "schema": { "type": "string", "enum": ["lectures", "lesson-content", "homework"] } }
+        ],
+        "responses": {
+          "200": { "description": "Section content" },
+          "404": { "description": "Unknown section" }
+        }
+      }
+    },
+    "/teacher/dashboard": {
+      "get": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "Teacher's own dashboard with their content (teacher role)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Dashboard" } }
+      }
+    },
+    "/teacher/dashboard/subscribers": {
+      "get": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "List of subscribers for the logged-in teacher (teacher role)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Subscribers" } }
+      }
+    },
+    "/teacher/dashboard/income": {
+      "get": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "Income for this month, last 3 months and year (teacher role)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Income summary" } }
+      }
+    },
+    "/teacher/dashboard/content": {
+      "post": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "Add content as a teacher (teacher role)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddContent" } } }
+        },
+        "responses": { "201": { "description": "Content created" } }
+      }
+    },
+    "/teacher/dashboard/content/{contentId}": {
+      "put": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "Edit own content (teacher role)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "contentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EditContent" } } }
+        },
+        "responses": { "200": { "description": "Content updated" } }
+      },
+      "delete": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "Delete own content (teacher role)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "contentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Content deleted" } }
+      }
+    },
+    "/admin/subscribers": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "All subscribers (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortOrder", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "EXPIRED", "CANCELLED"] } }
+        ],
+        "responses": { "200": { "description": "Paginated subscribers" } }
+      }
+    },
+    "/admin/teachers/{teacherId}/subscribers": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Subscribers of one teacher (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Paginated subscribers" } }
+      }
+    },
+    "/admin/income": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Total platform income (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Income summary" } }
+      }
+    },
+    "/admin/teachers/{teacherId}": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Full teacher detail (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Full teacher with contents and subscriptions" } }
+      },
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Edit teacher incl. prices (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EditTeacher" } } }
+        },
+        "responses": { "200": { "description": "Teacher updated" } }
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "summary": "Soft-delete teacher (admin only; blocked while teacher has active subscribers)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Teacher soft-deleted" },
+          "409": { "description": "Teacher has active subscribers" }
+        }
+      }
+    },
+    "/admin/teachers": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Add a teacher (admin only). No role-list code change needed — the new teacher's role SUB{id} is derived automatically.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddTeacher" } } }
+        },
+        "responses": { "201": { "description": "Teacher created" } }
+      }
+    },
+    "/admin/teachers/{teacherId}/content": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Add content for a teacher (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddContent" } } }
+        },
+        "responses": { "201": { "description": "Content created" } }
+      }
+    },
+    "/admin/teachers/{teacherId}/content/{contentId}": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Edit content of a teacher (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "contentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EditContent" } } }
+        },
+        "responses": { "200": { "description": "Content updated" } }
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "summary": "Delete content of a teacher (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "contentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Content deleted" } }
+      }
+    },
+    "/admin/logs": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "In-app Log History (admin only). Note: separate from the server-side developer log file.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "actionType", "in": "query", "schema": { "type": "string" } },
+          { "name": "actorType", "in": "query", "schema": { "type": "string", "enum": ["STUDENT", "TEACHER", "ADMIN", "SYSTEM"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortOrder", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Paginated logs" } }
+      }
+    },
+    "/admin/subscriptions/{subscriptionId}/cancel": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Cancel a user's active subscription (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "subscriptionId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Subscription cancelled" },
+          "404": { "description": "Not found" },
+          "409": { "description": "Not active" }
+        }
+      }
+    }
+  }
+}
