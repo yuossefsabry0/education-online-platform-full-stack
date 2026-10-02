@@ -70,8 +70,17 @@ async function login(userType, username, password) {
   expect(res.status).toBe(200);
   expectSuccessShape(res);
   expect(res.body.data.token).toBeTruthy();
-  expect(res.body.data.refreshToken).toBeTruthy();
-  return res.body.data;
+  const cookies = res.headers["set-cookie"] || [];
+  const refreshCookie = cookies.map((c) => String(c).split(";")[0]).join("; ");
+  expect(refreshCookie).toContain("refreshToken=");
+  return { ...res.body.data, refreshCookie, rawCookies: cookies };
+}
+
+function cookieHeader(value) {
+  if (!value) return {};
+  if (Array.isArray(value)) return { Cookie: value.map((c) => String(c).split(";")[0]).join("; ") };
+  if (typeof value === "string" && value.includes("=")) return { Cookie: value.split(";")[0] };
+  return { Cookie: `refreshToken=${value}` };
 }
 
 const testStudent1 = {
@@ -154,24 +163,24 @@ describe("Auth endpoints", () => {
       testStudent2.password
     );
     state.student2.accessToken = data.token;
-    state.student2.refreshToken = data.refreshToken;
+    state.student2.refreshToken = data.refreshCookie;
   });
 
-  it("POST /api/auth/login (student) returns token + refresh token", async () => {
+  it("POST /api/auth/login (student) returns token + refresh cookie", async () => {
     const data = await login(
       "student",
       testStudent1.username,
       testStudent1.password
     );
     state.student1.accessToken = data.token;
-    state.student1.refreshToken = data.refreshToken;
+    state.student1.refreshToken = data.refreshCookie;
     expect(data.user.userType).toBe("student");
   });
 
   it("POST /api/auth/login (teacher) returns a teacher token", async () => {
     const data = await login("teacher", "alpha_teacher", "teacher123");
     state.teacherALogin.accessToken = data.token;
-    state.teacherALogin.refreshToken = data.refreshToken;
+    state.teacherALogin.refreshToken = data.refreshCookie;
     expect(data.user.userType).toBe("teacher");
   });
 
@@ -191,16 +200,21 @@ describe("Auth endpoints", () => {
   it("POST /api/auth/refresh issues a new access token", async () => {
     const res = await request(app)
       .post("/api/auth/refresh")
-      .send({ refreshToken: state.student2.refreshToken });
+      .set(cookieHeader(state.student2.refreshToken))
+      .send({});
     expect(res.status).toBe(200);
     expectSuccessShape(res);
     expect(res.body.data.token).toBeTruthy();
+    const cookies = res.headers["set-cookie"] || [];
+    expect(cookies.join(";")).toContain("refreshToken=");
+    state.student2.refreshToken = cookies.map((c) => String(c).split(";")[0]).join("; ");
   });
 
   it("POST /api/auth/logout revokes the refresh token", async () => {
     const res = await request(app)
       .post("/api/auth/logout")
-      .send({ refreshToken: state.student2.refreshToken });
+      .set(cookieHeader(state.student2.refreshToken))
+      .send({});
     expect(res.status).toBe(200);
     expectSuccessShape(res);
   });
@@ -208,7 +222,8 @@ describe("Auth endpoints", () => {
   it("refresh with a revoked token is rejected", async () => {
     const res = await request(app)
       .post("/api/auth/refresh")
-      .send({ refreshToken: state.student2.refreshToken });
+      .set(cookieHeader(state.student2.refreshToken))
+      .send({});
     expectErrorShape(res, 401, "REFRESH_TOKEN_REVOKED");
   });
 });
@@ -875,18 +890,20 @@ describe("Soft-deleted teacher auth & content access (Fix Task 3)", () => {
     // deterministic for the same second, so we log in only once).
     const loginData = await login("teacher", "epsilon_teacher", "teacher123");
     epsilonAccessToken = loginData.token;
-    epsilonRefreshToken = loginData.refreshToken;
+    epsilonRefreshToken = loginData.refreshCookie;
     expect(loginData.user.userType).toBe("teacher");
   });
 
   it("an active teacher can still refresh and manage content (d)", async () => {
-    // Refresh still works for an active teacher.
     const refreshRes = await request(app)
       .post("/api/auth/refresh")
-      .send({ refreshToken: epsilonRefreshToken })
+      .set(cookieHeader(epsilonRefreshToken))
+      .send({})
       .expect(200);
     expectSuccessShape(refreshRes);
     expect(refreshRes.body.data.token).toBeTruthy();
+    const rotated = refreshRes.headers["set-cookie"] || [];
+    epsilonRefreshToken = rotated.map((c) => String(c).split(";")[0]).join("; ");
 
     // Active teacher can add, edit, and delete their own content.
     const toDelete = await request(app)
@@ -937,19 +954,20 @@ describe("Soft-deleted teacher auth & content access (Fix Task 3)", () => {
     const res = await request(app)
       .post("/api/auth/login")
       .send({ userType: "teacher", username: "epsilon_teacher", password: "teacher123" });
-    expectErrorShape(res, 404, "TEACHER_NOT_FOUND");
+    expectErrorShape(res, 401, "INVALID_CREDENTIALS");
   });
 
   it("a soft-deleted teacher's refresh token is rejected and revoked (b)", async () => {
     const res = await request(app)
       .post("/api/auth/refresh")
-      .send({ refreshToken: epsilonRefreshToken });
+      .set(cookieHeader(epsilonRefreshToken))
+      .send({});
     expectErrorShape(res, 404, "TEACHER_NOT_FOUND");
 
-    // The refresh token must have been revoked: reusing it is now rejected.
     const again = await request(app)
       .post("/api/auth/refresh")
-      .send({ refreshToken: epsilonRefreshToken });
+      .set(cookieHeader(epsilonRefreshToken))
+      .send({});
     expectErrorShape(again, 401, "REFRESH_TOKEN_REVOKED");
   });
 
@@ -1393,7 +1411,7 @@ describe("Cross-role username identity resolution", () => {
     const res = await request(app)
       .post("/api/auth/login")
       .send({ userType: "teacher", username: sharedUsername, password: sharedPassword });
-    expectErrorShape(res, 404, "TEACHER_NOT_FOUND");
+    expectErrorShape(res, 401, "INVALID_CREDENTIALS");
   });
 
   it("the shared-username student's identity is unaffected by the teacher rejection", async () => {

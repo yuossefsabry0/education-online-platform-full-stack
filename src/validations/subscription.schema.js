@@ -32,4 +32,15 @@ const confirmPaymentSchema = z.object({
     }),
 });
 
-module.exports = { teacherIdParam, confirmPaymentSchema, DURATIONS };
+const subscriptionIdParam = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null || value === "") return undefined;
+    return typeof value === "number" ? value : Number(value);
+  },
+  z
+    .number({ error: "subscriptionId must be a valid number" })
+    .int("subscriptionId must be an integer")
+    .positive("subscriptionId must be a positive integer")
+);
+
+module.exports = { teacherIdParam, subscriptionIdParam, confirmPaymentSchema, DURATIONS };

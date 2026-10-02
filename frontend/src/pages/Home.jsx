@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { endpoints } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.jsx";
+import SafeImg from "../components/SafeImg.jsx";
 
 const HERO_IMG =
-  "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1400&q=70";
+  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=70";
 const STUDY_IMG =
   "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=900&q=70";
 const CLASS_IMG =
@@ -67,7 +68,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-media img-zoom">
-          <img className="zoom-img" src={HERO_IMG} alt="Students learning together on campus" loading="lazy" />
+          <SafeImg className="zoom-img" src={HERO_IMG} alt="Students learning together on campus" label="Education System" eager />
         </div>
       </section>
 
@@ -76,7 +77,7 @@ export default function Home() {
         <div className="cards-3">
           <div className="card img-zoom">
             <div className="card-media">
-              <img className="zoom-img" src={STUDY_IMG} alt="Student taking notes while studying" loading="lazy" />
+              <SafeImg className="zoom-img" src={STUDY_IMG} alt="Student taking notes while studying" label="Discover teachers" />
             </div>
             <h3>1. Discover teachers</h3>
             <p className="muted">Search verified teachers by name, subject, and grade.</p>
@@ -86,7 +87,7 @@ export default function Home() {
           </div>
           <div className="card img-zoom">
             <div className="card-media">
-              <img className="zoom-img" src={CLASS_IMG} alt="Teacher leading a classroom lesson" loading="lazy" />
+              <SafeImg className="zoom-img" src={CLASS_IMG} alt="Teacher leading a classroom lesson" label="Subscribe" />
             </div>
             <h3>2. Subscribe</h3>
             <p className="muted">Pick a plan — 1, 3, 6, or 12 months — and confirm payment.</p>
@@ -96,7 +97,7 @@ export default function Home() {
           </div>
           <div className="card img-zoom">
             <div className="card-media">
-              <img className="zoom-img" src={ONLINE_IMG} alt="Student learning online with a laptop" loading="lazy" />
+              <SafeImg className="zoom-img" src={ONLINE_IMG} alt="Student learning online with a laptop" label="Learn" />
             </div>
             <h3>3. Learn</h3>
             <p className="muted">Unlock lectures, lesson content, and homework for your teachers.</p>

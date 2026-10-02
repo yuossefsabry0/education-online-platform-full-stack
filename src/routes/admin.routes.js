@@ -10,6 +10,7 @@ const {
   addContentSchema,
   editContentSchema,
 } = require("../validations/content.schema");
+const uploadController = require("../controllers/upload.controller");
 
 const router = Router();
 
@@ -52,6 +53,11 @@ router.put(
 router.delete(
   "/teachers/:teacherId/content/:contentId",
   adminController.deleteContent
+);
+router.post(
+  "/teachers/:teacherId/content/upload",
+  uploadController.uploadSingle,
+  uploadController.uploadTeacherFileAsAdmin
 );
 
 // Add Teacher (no manual code/schema change needed to enable their role routes)

@@ -1,20 +1,18 @@
 const prisma = require("../db/prisma");
 const { success, error } = require("../utils/apiResponse");
-const { deriveTeacherRole } = require("../utils/teacherRole");
 const { teacherIdParam } = require("../validations/subscription.schema");
-
-const TEACHER_INFO_SELECT = {
-  id: true,
-  name: true,
-  subject: true,
-  gradeClass: true,
-};
-
-const SECTION_DEFS = [
-  { key: "lectures", label: "Lectures" },
-  { key: "lesson-content", label: "Lesson Content" },
-  { key: "homework", label: "Homework" },
-];
+const { contentListQuerySchema } = require("../validations/content.schema");
+const { activeSubscriptionWhere } = require("../utils/subscriptionStatus");
+const { httpError } = require("../utils/httpError");
+const {
+  SECTION_DEFS,
+  findActiveTeacher,
+  listPublishedSectionContent,
+  sectionDefFor,
+  roleFor,
+  filterContentByTitle,
+  paginateItems,
+} = require("../services/teacherContent");
 
 const TYPE_SECTION_MAP = {
   LECTURE: "lectures",
@@ -35,28 +33,13 @@ function parseTeacherId(raw) {
       field: issue.path.join(".") || "teacherId",
       message: issue.message,
     }));
-    const err = new Error("Validation failed");
-    err.status = 400;
-    err.code = "VALIDATION_ERROR";
-    err.details = details;
-    throw err;
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", details);
   }
   return result.data;
 }
 
 function cleanOriginalUrl(req) {
   return req.originalUrl.split("?")[0];
-}
-
-function sectionDefFor(section) {
-  return SECTION_DEFS.find((item) => item.key === section);
-}
-
-async function findActiveTeacher(teacherId) {
-  return prisma.teacher.findFirst({
-    where: { id: teacherId, isActive: true },
-    select: TEACHER_INFO_SELECT,
-  });
 }
 
 async function showContentPage(req, res, next) {
@@ -76,7 +59,7 @@ async function showContentPage(req, res, next) {
     }));
 
     return success(res, {
-      roleRequired: deriveTeacherRole(teacherId),
+      roleRequired: roleFor(teacherId),
       teacher,
       sections,
       activeRoles: req.activeRoles,
@@ -84,6 +67,18 @@ async function showContentPage(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+function parseListQuery(raw) {
+  const result = contentListQuerySchema.safeParse(raw);
+  if (!result.success) {
+    const details = result.error.issues.map((issue) => ({
+      field: issue.path.join(".") || "query",
+      message: issue.message,
+    }));
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", details);
+  }
+  return result.data;
 }
 
 async function showSection(req, res, next) {
@@ -102,27 +97,16 @@ async function showSection(req, res, next) {
       return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
     }
 
-    const content = await prisma.teacherContent.findMany({
-      where: {
-        teacherId,
-        type: contentType,
-        isPublished: true,
-      },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        title: true,
-        body: true,
-        fileUrl: true,
-        type: true,
-        createdAt: true,
-      },
-    });
+    const query = parseListQuery(req.query);
+    const all = await listPublishedSectionContent(teacherId, contentType);
+    const filtered = filterContentByTitle(all, query.q);
+    const { items, pagination } = paginateItems(filtered, query.page, query.limit);
 
     return success(res, {
-      roleRequired: deriveTeacherRole(teacherId),
+      roleRequired: roleFor(teacherId),
       teacher,
-      section: { key: def.key, label: def.label, content },
+      section: { key: def.key, label: def.label, content: items },
+      pagination,
       activeRoles: req.activeRoles,
     });
   } catch (err) {
@@ -165,8 +149,12 @@ async function showTeacherDashboard(req, res, next) {
       },
     });
 
+    const query = parseListQuery(req.query);
+    const filtered = filterContentByTitle(content, query.q);
+    const { items, pagination } = paginateItems(filtered, query.page, query.limit);
+
     const sections = SECTION_DEFS.map(({ key, label }) => {
-      const sectionContent = content.filter(
+      const sectionContent = items.filter(
         (c) => TYPE_SECTION_MAP[c.type] === key
       );
       return { key, label, content: sectionContent };
@@ -175,6 +163,7 @@ async function showTeacherDashboard(req, res, next) {
     return success(res, {
       teacher,
       sections,
+      pagination,
       actions: {
         subscribers: `/api/teacher/dashboard/subscribers`,
         income: `/api/teacher/dashboard/income`,
@@ -199,8 +188,9 @@ async function viewSubscribers(req, res, next) {
       return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
     }
 
+    const now = new Date();
     const subscriptions = await prisma.subscription.findMany({
-      where: { teacherId },
+      where: { teacherId, ...activeSubscriptionWhere(now) },
       orderBy: { startDate: "desc" },
       select: {
         id: true,
@@ -474,7 +464,7 @@ async function getIncome(req, res, next) {
     const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
     const allSubscriptions = await prisma.subscription.findMany({
-      where: { teacherId },
+      where: { teacherId, ...activeSubscriptionWhere(now) },
       select: {
         price: true,
         startDate: true,

@@ -4,7 +4,8 @@ import { useAuth } from "../auth/AuthContext.jsx";
 function destinationFor(userType) {
   if (userType === "admin") return "/admin/dashboard";
   if (userType === "teacher") return "/teacher/dashboard";
-  return "/home";
+  if (userType === "student") return "/home";
+  return "/register";
 }
 
 export default function Navbar() {
@@ -31,8 +32,18 @@ export default function Navbar() {
             Teachers
           </NavLink>
           {isAuthenticated && userType === "student" && (
+            <NavLink to="/my-subscriptions" className={({ isActive }) => (isActive ? "active" : "")}>
+              My Subscriptions
+            </NavLink>
+          )}
+          {isAuthenticated && userType === "student" && (
             <NavLink to="/profile" className={({ isActive }) => (isActive ? "active" : "")}>
               Profile
+            </NavLink>
+          )}
+          {isAuthenticated && userType === "student" && (
+            <NavLink to="/history" className={({ isActive }) => (isActive ? "active" : "")}>
+              History
             </NavLink>
           )}
           {isAuthenticated && userType === "teacher" && (

@@ -1,6 +1,24 @@
 const { z } = require("zod");
+const { isAcceptedFileUrl } = require("../utils/fileUrl");
 
 const CONTENT_TYPES = ["LECTURE", "LESSON_CONTENT", "HOMEWORK"];
+
+const fileUrlField = z
+  .string()
+  .max(500, "fileUrl must be at most 500 characters")
+  .refine((v) => isAcceptedFileUrl(v), {
+    message: "fileUrl must be a valid http(s) URL or uploaded file path",
+  })
+  .optional();
+
+const nullableFileUrlField = z
+  .string()
+  .max(500, "fileUrl must be at most 500 characters")
+  .refine((v) => isAcceptedFileUrl(v), {
+    message: "fileUrl must be a valid http(s) URL or uploaded file path",
+  })
+  .optional()
+  .nullable();
 
 const addContentSchema = z.object({
   type: z.enum(CONTENT_TYPES, {
@@ -14,10 +32,7 @@ const addContentSchema = z.object({
     .string()
     .max(65535, "Body must be at most 65535 characters")
     .optional(),
-  fileUrl: z
-    .string()
-    .max(500, "fileUrl must be at most 500 characters")
-    .optional(),
+  fileUrl: fileUrlField,
   isPublished: z.boolean().optional().default(true),
 });
 
@@ -36,12 +51,31 @@ const editContentSchema = z.object({
     .string()
     .max(65535, "Body must be at most 65535 characters")
     .optional(),
-  fileUrl: z
-    .string()
-    .max(500, "fileUrl must be at most 500 characters")
-    .optional()
-    .nullable(),
+  fileUrl: nullableFileUrlField,
   isPublished: z.boolean().optional(),
 });
 
-module.exports = { addContentSchema, editContentSchema, CONTENT_TYPES };
+const intParam = (min, max) =>
+  z.preprocess(
+    (value) => {
+      if (value === undefined || value === null || value === "") return undefined;
+      return typeof value === "number" ? value : Number(value);
+    },
+    z
+      .number({ error: "Must be a valid number" })
+      .int("Must be an integer")
+      .min(min, `Must be at least ${min}`)
+      .max(max, `Must be at most ${max}`)
+  );
+
+const contentListQuerySchema = z.object({
+  page: intParam(1, 1_000_000).default(1),
+  limit: intParam(1, 50).default(10),
+  q: z
+    .string({ error: "q must be a string" })
+    .trim()
+    .max(100, "Search text must be at most 100 characters")
+    .default(""),
+});
+
+module.exports = { addContentSchema, editContentSchema, CONTENT_TYPES, contentListQuerySchema };

@@ -7,6 +7,7 @@ const { spawnSync } = require("child_process");
 const mariadb = require("mariadb");
 
 require("dotenv").config(); // globalSetup runs before setupFiles, so load .env here
+const { assertSafeTestDatabase } = require("./dbSafety");
 
 const projectRoot = path.join(__dirname, "..", "..");
 const testDbName =
@@ -33,6 +34,7 @@ module.exports = async () => {
   process.env.NODE_ENV = "test";
   process.env.RATE_LIMIT_ENABLED = "false";
 
+  assertSafeTestDatabase(process.env);
   await recreateTestDatabase();
   console.log(`[test] Recreated test database: ${testDbName}`);
 

@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   clearSession,
   endpoints,
-  getRefreshToken,
+  getAccessToken,
   getStoredUser,
   setSession,
   toApiError,
@@ -13,22 +14,32 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getStoredUser());
   const [authenticating, setAuthenticating] = useState(true);
+  const navigate = useNavigate();
 
-  // On load: if a session exists, re-validate it against GET /user/me.
-  // The api layer refreshes an expired login token automatically.
   useEffect(() => {
     let cancelled = false;
     async function revalidate() {
-      if (!getStoredUser()) {
-        setAuthenticating(false);
-        return;
-      }
+      const stored = getStoredUser();
       try {
+        if (!getAccessToken()) {
+          try {
+            await endpoints.refresh();
+          } catch {
+            if (stored) {
+              clearSession();
+              if (!cancelled) setUser(null);
+            }
+            if (!cancelled) setAuthenticating(false);
+            return;
+          }
+        }
         const data = await endpoints.me();
         if (!cancelled && data && data.user) {
-          const merged = { ...getStoredUser(), ...data.user, activeRoles: data.activeRoles };
+          const merged = { ...(stored || {}), ...data.user, activeRoles: data.activeRoles };
           setUser(merged);
           setSession({ user: merged });
+        } else if (!cancelled && !stored) {
+          setUser(null);
         }
       } catch {
         if (!cancelled) {
@@ -45,12 +56,21 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // POST /api/auth/login { userType, username, password }
-  // -> { token, tokenType, expiresIn, refreshToken, user }
+  useEffect(() => {
+    function onExpired(e) {
+      clearSession();
+      setUser(null);
+      const from = e && e.detail && e.detail.from ? e.detail.from : null;
+      navigate("/login", { replace: true, state: from ? { from } : undefined });
+    }
+    window.addEventListener("edu:session-expired", onExpired);
+    return () => window.removeEventListener("edu:session-expired", onExpired);
+  }, [navigate]);
+
   const login = useCallback(async ({ userType, username, password }) => {
     try {
       const data = await endpoints.login({ userType, username, password });
-      setSession({ token: data.token, refreshToken: data.refreshToken, user: data.user });
+      setSession({ token: data.token, user: data.user });
       setUser(data.user);
       return { ok: true, user: data.user };
     } catch (err) {
@@ -58,7 +78,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // POST /api/auth/register { name, username, email, password }
   const register = useCallback(async ({ name, username, email, password }) => {
     try {
       const data = await endpoints.register({ name, username, email, password });
@@ -68,18 +87,15 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // POST /api/auth/logout { refreshToken } (revokes server-side), then clear local.
   const logout = useCallback(async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        await endpoints.logout({ refreshToken });
-      } catch {
-        // Still clear the local session even if revocation fails.
-      }
+    try {
+      await endpoints.logout();
+    } catch {
+      return;
+    } finally {
+      clearSession();
+      setUser(null);
     }
-    clearSession();
-    setUser(null);
   }, []);
 
   const value = useMemo(

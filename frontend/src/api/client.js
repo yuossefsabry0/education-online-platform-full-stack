@@ -1,29 +1,18 @@
-// Centralized API layer for the Education System backend.
-//
-// Backend contract (verified against src/routes + controllers):
-// - Base URL: <backend>/api (see VITE_API_BASE_URL)
-// - Envelope: { success: true, data, error: null } on success,
-//             { success: false, data, error: { code, message, details } } on failure.
-// - Auth: "Authorization: Bearer <loginToken>" header. Login tokens live ~24h
-//   (LOGIN_TOKEN_EXPIRES_IN); refresh tokens live ~7d and are revocable.
-// - Roles (userType): "student" | "teacher" | "admin". Per-teacher access roles
-//   are dynamic strings "SUB{teacherId}" derived from ACTIVE subscriptions.
-
 import axios from "axios";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-const TOKEN_KEY = "edu.accessToken";
-const REFRESH_KEY = "edu.refreshToken";
 const USER_KEY = "edu.user";
 
+let memoryToken = null;
+
 export function getAccessToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return memoryToken;
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_KEY);
+  return null;
 }
 
 export function getStoredUser() {
@@ -35,14 +24,9 @@ export function getStoredUser() {
   }
 }
 
-export function setSession({ token, refreshToken, user }) {
+export function setSession({ token, user }) {
   if (token !== undefined) {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  }
-  if (refreshToken !== undefined) {
-    if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
-    else localStorage.removeItem(REFRESH_KEY);
+    memoryToken = token || null;
   }
   if (user !== undefined) {
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -51,17 +35,29 @@ export function setSession({ token, refreshToken, user }) {
 }
 
 export function updateAccessToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  memoryToken = token || null;
 }
 
 export function clearSession() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  memoryToken = null;
   localStorage.removeItem(USER_KEY);
 }
 
-const api = axios.create({ baseURL: API_BASE_URL });
+export function notifySessionExpired() {
+  try {
+    const from =
+      typeof window !== "undefined" && window.location
+        ? window.location.pathname + window.location.search
+        : null;
+    window.dispatchEvent(
+      new CustomEvent("edu:session-expired", { detail: { from } })
+    );
+  } catch {
+    return;
+  }
+}
+
+const api = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
@@ -72,16 +68,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Automatic refresh: on 401 (expired login token), try POST /auth/refresh
-// once with the stored refresh token, then retry the original request.
-// Auth endpoints themselves are never retried to avoid loops.
 let refreshPromise = null;
 
 async function refreshAccessTokenOnce() {
   if (!refreshPromise) {
-    const refreshToken = getRefreshToken();
     refreshPromise = axios
-      .post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
+      .post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
       .then((res) => {
         const data = res.data && res.data.data ? res.data.data : null;
         if (!data || !data.token) throw new Error("Refresh failed");
@@ -108,12 +100,7 @@ api.interceptors.response.use(
   async (err) => {
     const original = err.config || {};
     const status = err.response ? err.response.status : null;
-    if (
-      status === 401 &&
-      !original._retry &&
-      !isAuthEndpoint(original.url) &&
-      getRefreshToken()
-    ) {
+    if (status === 401 && !original._retry && !isAuthEndpoint(original.url)) {
       original._retry = true;
       try {
         const token = await refreshAccessTokenOnce();
@@ -122,6 +109,7 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshErr) {
         clearSession();
+        notifySessionExpired();
         return Promise.reject(refreshErr);
       }
     }
@@ -129,12 +117,10 @@ api.interceptors.response.use(
   }
 );
 
-// Unwrap the backend success envelope -> res.data.data
 export function unwrap(res) {
   return res.data ? res.data.data : null;
 }
 
-// Normalize a backend/axios failure into { status, code, message, details }
 export function toApiError(err) {
   const status = err && err.response ? err.response.status : null;
   const payload = err && err.response && err.response.data ? err.response.data : null;
@@ -192,49 +178,62 @@ async function del(path) {
   return unwrap(res);
 }
 
-export const endpoints = {
-  // POST /api/auth/register { name, username, email, password }
-  register: (body) => post("/auth/register", body),
-  // POST /api/auth/login { userType, username, password }
-  login: (body) => post("/auth/login", body),
-  // POST /api/auth/refresh { refreshToken }
-  refresh: (body) => post("/auth/refresh", body),
-  // POST /api/auth/logout { refreshToken }
-  logout: (body) => post("/auth/logout", body),
+async function uploadFile(path, file) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await api.post(path, form);
+  return unwrap(res);
+}
 
-  // GET /api/contact/ -> { message }
+export async function downloadStoredFile(fileUrl) {
+  const res = await api.get(fileUrl, { responseType: "blob" });
+  return res.data;
+}
+
+export function isSafeFileUrl(value) {
+  if (typeof value !== "string") return false;
+  if (/^\s*(javascript|vbscript)\s*:/i.test(value)) return false;
+  const trimmed = value.trim();
+  if (/^\/api\/files\/[a-f0-9]{32}\.[a-z0-9]+$/.test(trimmed)) return true;
+  return /^https:\/\//i.test(trimmed) || /^http:\/\//i.test(trimmed);
+}
+
+export const endpoints = {
+  register: (body) => post("/auth/register", body),
+  login: (body) => post("/auth/login", body),
+  refresh: () => post("/auth/refresh", {}),
+  logout: (body) => post("/auth/logout", body || {}),
+  changePassword: (body) => put("/auth/password", body),
+  requestPasswordReset: (body) => post("/auth/password-reset/request", body),
+  confirmPasswordReset: (body) => post("/auth/password-reset/confirm", body),
+  resendVerification: (body) => post("/auth/verify-email/resend", body),
+  confirmVerification: (body) => post("/auth/verify-email/confirm", body),
+
   contact: () => get("/contact/"),
 
-  // GET /api/teachers?page&limit&sortBy&sortOrder
   listTeachers: (params) => get("/teachers", params),
-  // GET /api/teachers/search?q&page&limit&sortBy&sortOrder
   searchTeachers: (params) => get("/teachers/search", params),
-  // GET /api/teachers/:teacherId/content (auth + SUB{teacherId} coverage)
   teacherContentIndex: (teacherId) => get(`/teachers/${teacherId}/content`),
 
-  // GET /api/user/me -> { user, activeRoles }
   me: () => get("/user/me"),
+  history: (params) => get("/user/history", params),
 
-  // GET /api/subscriptions/teacher/:teacherId (students only)
   subscriptionPlans: (teacherId) => get(`/subscriptions/teacher/${teacherId}`),
-  // POST /api/subscriptions/confirm-payment { teacherId, duration }
   confirmPayment: (body) => post("/subscriptions/confirm-payment", body),
+  cancelSubscription: (subscriptionId) => post(`/subscriptions/${subscriptionId}/cancel`, {}),
+  mySubscriptions: () => get("/subscriptions/mine"),
 
-  // GET /api/content/teacher/:teacherId (subscribed students)
   contentPage: (teacherId) => get(`/content/teacher/${teacherId}`),
-  // GET /api/content/teacher/:teacherId/:section
-  // section: lectures | lesson-content | homework
-  contentSection: (teacherId, section) => get(`/content/teacher/${teacherId}/${section}`),
+  contentSection: (teacherId, section, params) => get(`/content/teacher/${teacherId}/${section}`, params),
 
-  // Teacher role routes (userType === "teacher")
-  teacherDashboard: () => get("/teacher/dashboard"),
+  teacherDashboard: (params) => get("/teacher/dashboard", params),
   teacherSubscribers: () => get("/teacher/dashboard/subscribers"),
   teacherIncome: () => get("/teacher/dashboard/income"),
   teacherAddContent: (body) => post("/teacher/dashboard/content", body),
   teacherEditContent: (contentId, body) => put(`/teacher/dashboard/content/${contentId}`, body),
   teacherDeleteContent: (contentId) => del(`/teacher/dashboard/content/${contentId}`),
+  teacherUploadContent: (file) => uploadFile("/teacher/dashboard/content/upload", file),
 
-  // Admin routes (userType === "admin")
   adminSubscribers: (params) => get("/admin/subscribers", params),
   adminTeacherSubscribers: (teacherId, params) => get(`/admin/teachers/${teacherId}/subscribers`, params),
   adminIncome: () => get("/admin/income"),
@@ -243,6 +242,7 @@ export const endpoints = {
   adminAddTeacher: (body) => post("/admin/teachers", body),
   adminDeleteTeacher: (teacherId) => del(`/admin/teachers/${teacherId}`),
   adminAddContent: (teacherId, body) => post(`/admin/teachers/${teacherId}/content`, body),
+  adminUploadContent: (teacherId, file) => uploadFile(`/admin/teachers/${teacherId}/content/upload`, file),
   adminEditContent: (teacherId, contentId, body) => put(`/admin/teachers/${teacherId}/content/${contentId}`, body),
   adminDeleteContent: (teacherId, contentId) => del(`/admin/teachers/${teacherId}/content/${contentId}`),
   adminLogs: (params) => get("/admin/logs", params),

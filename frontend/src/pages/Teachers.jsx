@@ -118,7 +118,11 @@ export default function Teachers() {
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
-                        onClick={() => navigate(`/content/teacher/${teacher.id}`)}
+                        onClick={() =>
+                          userType === "student"
+                            ? navigate(`/content/teacher/${teacher.id}`)
+                            : navigate("/login", { state: { from: `/content/teacher/${teacher.id}` } })
+                        }
                       >
                         View content
                       </button>

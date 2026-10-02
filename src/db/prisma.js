@@ -11,11 +11,8 @@ const adapter = new PrismaMariaDb({
   user: config.database.user,
   password: config.database.password,
   database: config.database.name,
-  connectionLimit: 5,
-  // Wait longer than the driver's 10s default when acquiring a pooled
-  // connection, so a slow-but-reachable database does not trip the pool
-  // timeout (P2039) on the first query of a pass.
-  acquireTimeout: 30000,
+  connectionLimit: config.database.pool.connectionLimit,
+  acquireTimeout: config.database.pool.acquireTimeout,
 });
 
 const prisma = new PrismaClient({

@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const bcrypt = require("bcryptjs");
 const prisma = require("../src/db/prisma");
+const config = require("../src/config");
 
 const TEACHERS = [
   {
@@ -56,7 +57,7 @@ async function seedAdmin(passwordHash) {
 
   await prisma.admin.upsert({
     where: { username },
-    update: {},
+    update: { email },
     create: { username, email, password: passwordHash },
   });
 
@@ -67,7 +68,13 @@ async function seedTeachers(passwordHash) {
   for (const teacher of TEACHERS) {
     await prisma.teacher.upsert({
       where: { username: teacher.username },
-      update: {},
+      update: {
+        name: teacher.name,
+        email: teacher.email,
+        subject: teacher.subject,
+        gradeClass: teacher.gradeClass,
+        ...computePrices(teacher.basePrice),
+      },
       create: {
         id: teacher.id,
         name: teacher.name,
@@ -94,11 +101,11 @@ async function seedStudent() {
   const username = process.env.SEED_STUDENT_USERNAME || "student1";
   const email = process.env.SEED_STUDENT_EMAIL || "student1@education-system.dev";
   const password = process.env.SEED_STUDENT_PASSWORD || "student123";
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, config.security.bcryptRounds);
 
   await prisma.student.upsert({
     where: { username },
-    update: {},
+    update: { name, email },
     create: { name, username, email, password: passwordHash },
   });
 
@@ -107,10 +114,10 @@ async function seedStudent() {
 
 async function main() {
   const adminPassword = process.env.SEED_ADMIN_PASSWORD || "admin123";
-  const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+  const adminPasswordHash = await bcrypt.hash(adminPassword, config.security.bcryptRounds);
 
   const teacherPassword = process.env.SEED_TEACHER_PASSWORD || "teacher123";
-  const teacherPasswordHash = await bcrypt.hash(teacherPassword, 10);
+  const teacherPasswordHash = await bcrypt.hash(teacherPassword, config.security.bcryptRounds);
 
   await seedAdmin(adminPasswordHash);
   await seedTeachers(teacherPasswordHash);

@@ -25,13 +25,37 @@ const config = {
     name: isTest
       ? process.env.TEST_DATABASE_NAME || "education_system_test"
       : process.env.DATABASE_NAME || "education_system",
+    pool: {
+      connectionLimit: 5,
+      acquireTimeout: 30000,
+    },
   },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || "dev_access_secret_change_me",
     refreshSecret: process.env.JWT_REFRESH_SECRET || "dev_refresh_secret_change_me",
-    accessExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
     refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
     loginTokenExpiresIn: process.env.LOGIN_TOKEN_EXPIRES_IN || "24h",
+  },
+  security: {
+    bcryptRounds: 10,
+  },
+  jobs: {
+    expiryIntervalMs: 60 * 1000,
+  },
+  contact: {
+    email: process.env.CONTACT_EMAIL || "test@gmail.com",
+  },
+  mail: {
+    provider: process.env.MAIL_PROVIDER || "log",
+    from: process.env.MAIL_FROM || process.env.CONTACT_EMAIL || "test@gmail.com",
+    smtpHost: process.env.MAIL_SMTP_HOST || "",
+    smtpPort: parseInt(process.env.MAIL_SMTP_PORT, 10) || 587,
+    smtpUser: process.env.MAIL_SMTP_USER || "",
+    smtpPassword: process.env.MAIL_SMTP_PASSWORD || "",
+  },
+  storage: {
+    root: process.env.UPLOAD_DIR || "uploads",
+    maxBytes: 10 * 1024 * 1024,
   },
   // Rate limiting can be disabled per environment (RATE_LIMIT_ENABLED=false);
   // integration tests rely on this so they never trip the auth limits.

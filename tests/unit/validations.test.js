@@ -105,8 +105,8 @@ describe("auth schemas", () => {
     ).toBe(false);
   });
 
-  it("refresh token requires the token", () => {
-    expect(refreshTokenSchema.safeParse({}).success).toBe(false);
+  it("refresh token accepts cookie-based requests without a body token", () => {
+    expect(refreshTokenSchema.safeParse({}).success).toBe(true);
     expect(refreshTokenSchema.safeParse({ refreshToken: "abc" }).success).toBe(true);
   });
 });

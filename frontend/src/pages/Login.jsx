@@ -95,6 +95,9 @@ export default function Login() {
         <p className="muted center">
           New student? <Link to="/register">Create an account</Link>
         </p>
+        <p className="muted center">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
       </div>
     </div>
   );

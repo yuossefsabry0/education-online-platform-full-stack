@@ -8,6 +8,7 @@ const subscriptionRoutes = require("./subscription.routes");
 const contentRoutes = require("./content.routes");
 const dashboardRoutes = require("./dashboard.routes");
 const adminRoutes = require("./admin.routes");
+const filesRoutes = require("./files.routes");
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use("/subscriptions", subscriptionRoutes);
 router.use("/content", contentRoutes);
 router.use("/teacher", dashboardRoutes);
 router.use("/admin", adminRoutes);
+router.use("/", filesRoutes);
 
 module.exports = router;

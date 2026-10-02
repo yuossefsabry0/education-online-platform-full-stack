@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const prisma = require("../db/prisma");
 const config = require("../config");
 const { success, error } = require("../utils/apiResponse");
@@ -7,8 +8,13 @@ const {
   signRefreshToken,
   verifyRefreshToken,
 } = require("../utils/token");
+const {
+  setRefreshCookie,
+  clearRefreshCookie,
+  getPresentedRefreshToken,
+} = require("../utils/refreshCookie");
 
-const PASSWORD_SALT_ROUNDS = 10;
+const PASSWORD_SALT_ROUNDS = config.security.bcryptRounds;
 
 const OWNER_TYPE_MAP = {
   student: "STUDENT",
@@ -74,13 +80,14 @@ function parseDurationToSeconds(value) {
   return amount * (multipliers[unit] || 86400);
 }
 
-async function createRefreshTokenFor(userType, id) {
+async function createRefreshTokenFor(userType, id, familyId) {
   const token = signRefreshToken({ userType, id });
   const ownerType = OWNER_TYPE_MAP[userType];
 
   const data = {
     token,
     ownerType,
+    familyId: familyId || crypto.randomUUID(),
     expiresAt: computeRefreshExpiry(),
   };
 
@@ -165,17 +172,17 @@ async function login(req, res) {
   }
 
   if (userType === "teacher" && user.isActive === false) {
-    return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
+    return error(res, "Invalid username or password", 401, "INVALID_CREDENTIALS");
   }
 
   const token = signLoginToken({ userType, id: user.id });
   const refreshToken = await createRefreshTokenFor(userType, user.id);
+  setRefreshCookie(res, refreshToken);
 
   return success(res, {
     token,
     tokenType: "Bearer",
     expiresIn: config.jwt.loginTokenExpiresIn,
-    refreshToken,
     user: {
       userType,
       id: user.id,
@@ -185,7 +192,7 @@ async function login(req, res) {
 }
 
 async function refresh(req, res) {
-  const { refreshToken } = req.body;
+  const refreshToken = getPresentedRefreshToken(req);
 
   if (!refreshToken) {
     return error(res, "Refresh token is required", 400, "REFRESH_TOKEN_REQUIRED");
@@ -202,45 +209,100 @@ async function refresh(req, res) {
     return error(res, "Invalid refresh token", 401, "INVALID_REFRESH_TOKEN");
   }
 
-  const stored = await prisma.refreshToken.findUnique({
-    where: { token: refreshToken },
-  });
-
-  if (!stored || stored.revokedAt) {
-    return error(res, "Refresh token has been revoked", 401, "REFRESH_TOKEN_REVOKED");
-  }
-
-  if (stored.expiresAt <= new Date()) {
-    return error(res, "Refresh token has expired", 401, "REFRESH_TOKEN_EXPIRED");
-  }
-
-  const userIdField =
-    payload.userType === "student"
-      ? "studentId"
-      : payload.userType === "teacher"
-      ? "teacherId"
-      : "adminId";
-
-  if (!stored[userIdField] || stored[userIdField] !== payload.id) {
-    return error(res, "Refresh token does not match user", 401, "INVALID_REFRESH_TOKEN");
-  }
-
-  if (payload.userType === "teacher") {
-    const teacher = await prisma.teacher.findFirst({
-      where: { id: payload.id, isActive: true },
-      select: { id: true },
-    });
-
-    if (!teacher) {
-      await prisma.refreshToken.update({
-        where: { token: refreshToken },
-        data: { revokedAt: new Date() },
+  const now = new Date();
+  let rotation;
+  let attempts = 0;
+  while (true) {
+    attempts += 1;
+    try {
+      rotation = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.refreshToken.updateMany({
+        where: { token: refreshToken, revokedAt: null, expiresAt: { gt: now } },
+        data: { revokedAt: now },
       });
-      return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
+      if (claimed.count !== 1) {
+        const stored = await tx.refreshToken.findUnique({
+          where: { token: refreshToken },
+        });
+        if (stored && stored.revokedAt) {
+          if (stored.familyId) {
+            await tx.refreshToken.updateMany({
+              where: { familyId: stored.familyId, revokedAt: null },
+              data: { revokedAt: now },
+            });
+          }
+          const err = new Error("Refresh token has been revoked");
+          err.status = 401;
+          err.code = "REFRESH_TOKEN_REVOKED";
+          throw err;
+        }
+        if (stored && stored.expiresAt <= now) {
+          const err = new Error("Refresh token has expired");
+          err.status = 401;
+          err.code = "REFRESH_TOKEN_EXPIRED";
+          throw err;
+        }
+        const err = new Error("Refresh token has been revoked");
+        err.status = 401;
+        err.code = "REFRESH_TOKEN_REVOKED";
+        throw err;
+      }
+      const stored = await tx.refreshToken.findUnique({
+        where: { token: refreshToken },
+      });
+      const userIdField =
+        payload.userType === "student"
+          ? "studentId"
+          : payload.userType === "teacher"
+          ? "teacherId"
+          : "adminId";
+      if (!stored || !stored[userIdField] || stored[userIdField] !== payload.id) {
+        const err = new Error("Invalid refresh token");
+        err.status = 401;
+        err.code = "INVALID_REFRESH_TOKEN";
+        throw err;
+      }
+      if (payload.userType === "teacher") {
+        const teacher = await tx.teacher.findFirst({
+          where: { id: payload.id, isActive: true },
+          select: { id: true },
+        });
+        if (!teacher) {
+          return { inactiveTeacher: true };
+        }
+      }
+      const familyId = stored.familyId || crypto.randomUUID();
+      const nextRefresh = signRefreshToken({ userType: payload.userType, id: payload.id });
+      const ownerType = OWNER_TYPE_MAP[payload.userType];
+      const data = {
+        token: nextRefresh,
+        ownerType,
+        familyId,
+        expiresAt: computeRefreshExpiry(),
+      };
+      if (payload.userType === "student") data.studentId = payload.id;
+      if (payload.userType === "teacher") data.teacherId = payload.id;
+      if (payload.userType === "admin") data.adminId = payload.id;
+      await tx.refreshToken.create({ data });
+      return { nextRefresh };
+      });
+      break;
+    } catch (err) {
+      if (err && err.code === "P2034" && attempts < 3) continue;
+      if (err.status && err.code) {
+        return error(res, err.message, err.status, err.code);
+      }
+      throw err;
     }
   }
 
   const newToken = signLoginToken({ userType: payload.userType, id: payload.id });
+
+  if (rotation.inactiveTeacher) {
+    return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
+  }
+
+  setRefreshCookie(res, rotation.nextRefresh);
 
   return success(res, {
     token: newToken,
@@ -251,9 +313,10 @@ async function refresh(req, res) {
 }
 
 async function logout(req, res) {
-  const { refreshToken } = req.body;
+  const refreshToken = getPresentedRefreshToken(req);
 
   if (!refreshToken) {
+    clearRefreshCookie(res);
     return error(res, "Refresh token is required", 400, "REFRESH_TOKEN_REQUIRED");
   }
 
@@ -261,6 +324,8 @@ async function logout(req, res) {
     where: { token: refreshToken, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+
+  clearRefreshCookie(res);
 
   if (updated.count === 0) {
     return error(res, "Invalid or already revoked refresh token", 400, "INVALID_REFRESH_TOKEN");

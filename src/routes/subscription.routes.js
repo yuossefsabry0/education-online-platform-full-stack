@@ -6,6 +6,10 @@ const { confirmPaymentSchema } = require("../validations/subscription.schema");
 
 const router = Router();
 
+// Calling student's own active subscriptions with teacher details.
+// Powers the frontend "My Subscriptions" page.
+router.get("/mine", requireAuth, subscriptionController.listMine);
+
 // Subscription page for one teacher: available durations + prices.
 // Reached after clicking "Subscribe" on the searched teacher.
 router.get(
@@ -23,6 +27,12 @@ router.post(
   requireAuth,
   validate(confirmPaymentSchema),
   subscriptionController.confirmPayment
+);
+
+router.post(
+  "/:subscriptionId/cancel",
+  requireAuth,
+  subscriptionController.cancelMine
 );
 
 module.exports = router;

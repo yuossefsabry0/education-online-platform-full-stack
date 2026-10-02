@@ -6,14 +6,61 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "BASE_URL", "value": "http://localhost:5000/api", "type": "string" },
-    { "key": "studentToken", "value": "", "type": "string" },
-    { "key": "teacherToken", "value": "", "type": "string" },
-    { "key": "adminToken", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" },
-    { "key": "teacherId", "value": "1", "type": "string" },
-    { "key": "contentId", "value": "1", "type": "string" },
-    { "key": "subscriptionId", "value": "1", "type": "string" }
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "studentToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "teacherToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "teacherId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "contentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "subscriptionId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verificationToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fileName",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -24,7 +71,15 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{BASE_URL}}/health", "host": ["{{BASE_URL}}"], "path": ["health"] }
+            "url": {
+              "raw": "{{BASE_URL}}/health",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
           }
         }
       ]
@@ -36,12 +91,26 @@
           "name": "Register student",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"John Doe\",\n  \"username\": \"john_doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"secret123\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/auth/register", "host": ["{{BASE_URL}}"], "path": ["auth", "register"] }
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
           }
         },
         {
@@ -68,60 +137,268 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"student1\",\n  \"password\": \"student123\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/auth/login", "host": ["{{BASE_URL}}"], "path": ["auth", "login"] }
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
           }
         },
         {
           "name": "Login Teacher",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"ahmed\",\n  \"password\": \"teacher123\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/auth/login", "host": ["{{BASE_URL}}"], "path": ["auth", "login"] }
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
           }
         },
         {
           "name": "Login Admin",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/auth/login", "host": ["{{BASE_URL}}"], "path": ["auth", "login"] }
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
           }
         },
         {
           "name": "Refresh token",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/auth/refresh", "host": ["{{BASE_URL}}"], "path": ["auth", "refresh"] }
+            "url": {
+              "raw": "{{BASE_URL}}/auth/refresh",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
           }
         },
         {
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/auth/logout", "host": ["{{BASE_URL}}"], "path": ["auth", "logout"] }
+            "url": {
+              "raw": "{{BASE_URL}}/auth/logout",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/password",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"student123\",\n  \"newPassword\": \"newstudent123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Request password reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/password-reset/request",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "password-reset",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student1@education-system.dev\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Confirm password reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/password-reset/confirm",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "password-reset",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"newstudent123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Resend verification email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/verify-email/resend",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email",
+                "resend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student1@education-system.dev\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Confirm verification email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/verify-email/confirm",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{verificationToken}}\"\n}"
+            }
           }
         }
       ]
@@ -134,7 +411,15 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{BASE_URL}}/contact", "host": ["{{BASE_URL}}"], "path": ["contact"] }
+            "url": {
+              "raw": "{{BASE_URL}}/contact",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "contact"
+              ]
+            }
           }
         }
       ]
@@ -149,13 +434,29 @@
             "header": [],
             "url": {
               "raw": "{{BASE_URL}}/teachers?page=1&limit=10&sortBy=id&sortOrder=asc",
-              "host": ["{{BASE_URL}}"],
-              "path": ["teachers"],
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teachers"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "10" },
-                { "key": "sortBy", "value": "id" },
-                { "key": "sortOrder", "value": "asc" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "id"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc"
+                }
               ]
             }
           }
@@ -167,9 +468,19 @@
             "header": [],
             "url": {
               "raw": "{{BASE_URL}}/teachers/search?q=ahm",
-              "host": ["{{BASE_URL}}"],
-              "path": ["teachers", "search"],
-              "query": [{ "key": "q", "value": "ahm" }]
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teachers",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "ahm"
+                }
+              ]
             }
           }
         },
@@ -177,8 +488,23 @@
           "name": "Teacher content (subscriber only)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/teachers/{{teacherId}}/content", "host": ["{{BASE_URL}}"], "path": ["teachers", "{{teacherId}}", "content"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/teachers/{{teacherId}}/content",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teachers",
+                "{{teacherId}}",
+                "content"
+              ]
+            }
           }
         }
       ]
@@ -190,8 +516,54 @@
           "name": "Me (profile + roles)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/user/me", "host": ["{{BASE_URL}}"], "path": ["user", "me"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/user/me",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "My history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/user/history?page=1&limit=10",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "user",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
           }
         }
       ]
@@ -200,11 +572,48 @@
       "name": "Subscriptions",
       "item": [
         {
+          "name": "My subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/subscriptions/mine",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "subscriptions",
+                "mine"
+              ]
+            }
+          }
+        },
+        {
           "name": "View plans for teacher",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/subscriptions/teacher/{{teacherId}}", "host": ["{{BASE_URL}}"], "path": ["subscriptions", "teacher", "{{teacherId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/subscriptions/teacher/{{teacherId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "subscriptions",
+                "teacher",
+                "{{teacherId}}"
+              ]
+            }
           }
         },
         {
@@ -212,14 +621,52 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{studentToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"teacherId\": {{teacherId}},\n  \"duration\": \"ONE_MONTH\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/subscriptions/confirm-payment", "host": ["{{BASE_URL}}"], "path": ["subscriptions", "confirm-payment"] }
+            "url": {
+              "raw": "{{BASE_URL}}/subscriptions/confirm-payment",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "subscriptions",
+                "confirm-payment"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel own subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/subscriptions/{{subscriptionId}}/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "subscriptions",
+                "{{subscriptionId}}",
+                "cancel"
+              ]
+            }
           }
         }
       ]
@@ -231,32 +678,159 @@
           "name": "Content page for teacher",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}", "host": ["{{BASE_URL}}"], "path": ["content", "teacher", "{{teacherId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "content",
+                "teacher",
+                "{{teacherId}}"
+              ]
+            }
           }
         },
         {
           "name": "Content section (lectures)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}/lectures", "host": ["{{BASE_URL}}"], "path": ["content", "teacher", "{{teacherId}}", "lectures"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}/lectures",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "content",
+                "teacher",
+                "{{teacherId}}",
+                "lectures"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "q",
+                  "value": ""
+                }
+              ]
+            }
           }
         },
         {
           "name": "Content section (lesson-content)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}/lesson-content", "host": ["{{BASE_URL}}"], "path": ["content", "teacher", "{{teacherId}}", "lesson-content"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}/lesson-content",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "content",
+                "teacher",
+                "{{teacherId}}",
+                "lesson-content"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "q",
+                  "value": ""
+                }
+              ]
+            }
           }
         },
         {
           "name": "Content section (homework)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{studentToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}/homework", "host": ["{{BASE_URL}}"], "path": ["content", "teacher", "{{teacherId}}", "homework"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/content/teacher/{{teacherId}}/homework",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "content",
+                "teacher",
+                "{{teacherId}}",
+                "homework"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "q",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Download uploaded file",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/files/{{fileName}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "files",
+                "{{fileName}}"
+              ]
+            }
           }
         }
       ]
@@ -268,24 +842,68 @@
           "name": "Dashboard",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/teacher/dashboard", "host": ["{{BASE_URL}}"], "path": ["teacher", "dashboard"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard"
+              ]
+            }
           }
         },
         {
           "name": "Subscribers",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/teacher/dashboard/subscribers", "host": ["{{BASE_URL}}"], "path": ["teacher", "dashboard", "subscribers"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard/subscribers",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard",
+                "subscribers"
+              ]
+            }
           }
         },
         {
           "name": "Income",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/teacher/dashboard/income", "host": ["{{BASE_URL}}"], "path": ["teacher", "dashboard", "income"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard/income",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard",
+                "income"
+              ]
+            }
           }
         },
         {
@@ -293,14 +911,30 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"type\": \"LECTURE\",\n  \"title\": \"Introduction\",\n  \"body\": \"Some notes\",\n  \"isPublished\": true\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/teacher/dashboard/content", "host": ["{{BASE_URL}}"], "path": ["teacher", "dashboard", "content"] }
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard/content",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard",
+                "content"
+              ]
+            }
           }
         },
         {
@@ -308,19 +942,89 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{teacherToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated title\"\n}" },
-            "url": { "raw": "{{BASE_URL}}/teacher/dashboard/content/{{contentId}}", "host": ["{{BASE_URL}}"], "path": ["teacher", "dashboard", "content", "{{contentId}}"] }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated title\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard/content/{{contentId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard",
+                "content",
+                "{{contentId}}"
+              ]
+            }
           }
         },
         {
           "name": "Delete content",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{teacherToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/teacher/dashboard/content/{{contentId}}", "host": ["{{BASE_URL}}"], "path": ["teacher", "dashboard", "content", "{{contentId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard/content/{{contentId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard",
+                "content",
+                "{{contentId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload content file",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{teacherToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/teacher/dashboard/content/upload",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "teacher",
+                "dashboard",
+                "content",
+                "upload"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
           }
         }
       ]
@@ -332,14 +1036,30 @@
           "name": "All subscribers",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
             "url": {
               "raw": "{{BASE_URL}}/admin/subscribers?page=1&limit=10",
-              "host": ["{{BASE_URL}}"],
-              "path": ["admin", "subscribers"],
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "subscribers"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "10" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
               ]
             }
           }
@@ -348,24 +1068,69 @@
           "name": "Subscribers per teacher",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/subscribers", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}", "subscribers"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/subscribers",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}",
+                "subscribers"
+              ]
+            }
           }
         },
         {
           "name": "Total income",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/admin/income", "host": ["{{BASE_URL}}"], "path": ["admin", "income"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/income",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "income"
+              ]
+            }
           }
         },
         {
           "name": "Teacher detail",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}"
+              ]
+            }
           }
         },
         {
@@ -373,14 +1138,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"New Teacher\",\n  \"username\": \"new_teacher\",\n  \"email\": \"new_teacher@education-system.dev\",\n  \"password\": \"teacher123\",\n  \"subject\": \"Math\",\n  \"gradeClass\": \"2nd year secondary grade\",\n  \"price1Month\": 60,\n  \"price3Months\": 162,\n  \"price6Months\": 300,\n  \"price1Year\": 540\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/admin/teachers", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers"] }
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers"
+              ]
+            }
           }
         },
         {
@@ -388,19 +1168,53 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"price1Month\": 70\n}" },
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}"] }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price1Month\": 70\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}"
+              ]
+            }
           }
         },
         {
           "name": "Delete teacher",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}"
+              ]
+            }
           }
         },
         {
@@ -408,14 +1222,31 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"type\": \"HOMEWORK\",\n  \"title\": \"Homework 1\",\n  \"body\": \"Solve the exercises\"\n}"
             },
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}", "content"] }
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}",
+                "content"
+              ]
+            }
           }
         },
         {
@@ -423,35 +1254,95 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Homework 1 updated\"\n}" },
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content/{{contentId}}", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}", "content", "{{contentId}}"] }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Homework 1 updated\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content/{{contentId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}",
+                "content",
+                "{{contentId}}"
+              ]
+            }
           }
         },
         {
           "name": "Delete content",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content/{{contentId}}", "host": ["{{BASE_URL}}"], "path": ["admin", "teachers", "{{teacherId}}", "content", "{{contentId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content/{{contentId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}",
+                "content",
+                "{{contentId}}"
+              ]
+            }
           }
         },
         {
           "name": "Log history",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
             "url": {
               "raw": "{{BASE_URL}}/admin/logs?page=1&limit=20&sortBy=timestamp&sortOrder=desc",
-              "host": ["{{BASE_URL}}"],
-              "path": ["admin", "logs"],
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "logs"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" },
-                { "key": "sortBy", "value": "timestamp" },
-                { "key": "sortOrder", "value": "desc" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "timestamp"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                }
               ]
             }
           }
@@ -460,8 +1351,59 @@
           "name": "Cancel subscription",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
-            "url": { "raw": "{{BASE_URL}}/admin/subscriptions/{{subscriptionId}}/cancel", "host": ["{{BASE_URL}}"], "path": ["admin", "subscriptions", "{{subscriptionId}}", "cancel"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/subscriptions/{{subscriptionId}}/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "subscriptions",
+                "{{subscriptionId}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload content file for teacher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/teachers/{{teacherId}}/content/upload",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "teachers",
+                "{{teacherId}}",
+                "content",
+                "upload"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
           }
         }
       ]

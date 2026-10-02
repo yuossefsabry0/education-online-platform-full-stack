@@ -4,6 +4,7 @@ const {
   verifyLoginToken,
   extractBearerToken,
 } = require("../utils/token");
+const { activeSubscriptionWhere } = require("../utils/subscriptionStatus");
 
 function attachUser(req) {
   const token = extractBearerToken(req);
@@ -49,8 +50,7 @@ async function loadActiveRoles(user) {
   const subscriptions = await prisma.subscription.findMany({
     where: {
       studentId: user.id,
-      status: { notIn: ["EXPIRED", "CANCELLED"] },
-      endDate: { gt: now },
+      ...activeSubscriptionWhere(now),
     },
     select: { teacherRole: true },
   });

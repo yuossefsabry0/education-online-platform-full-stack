@@ -1,4 +1,5 @@
 const { Prisma } = require("@prisma/client");
+const multer = require("multer");
 const { error } = require("../utils/apiResponse");
 const { logger } = require("../utils/logger");
 
@@ -16,6 +17,13 @@ function normalizeError(err) {
   if (err.type && err.type.startsWith("entity.")) {
     // e.g. entity.too.large (payload too big)
     return { status: 413, code: "PAYLOAD_TOO_LARGE", message: err.message };
+  }
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return { status: 413, code: "FILE_TOO_LARGE", message: "File too large" };
+    }
+    return { status: 400, code: "UPLOAD_ERROR", message: err.message };
   }
 
   // Prisma-known request errors (unique conflicts, missing records, FK, ...).

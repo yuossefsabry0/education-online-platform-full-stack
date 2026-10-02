@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const config = require("../config");
 
 function signLoginToken(payload) {
@@ -12,7 +13,7 @@ function verifyLoginToken(token) {
 }
 
 function signRefreshToken(payload) {
-  return jwt.sign(payload, config.jwt.refreshSecret, {
+  return jwt.sign({ ...payload, jti: crypto.randomUUID() }, config.jwt.refreshSecret, {
     expiresIn: config.jwt.refreshExpiresIn,
   });
 }

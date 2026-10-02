@@ -2,15 +2,10 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../config");
 
-// ---------------------------------------------------------------------------
-// Server-side developer/operational logging.
-// Writes timestamped entries to a rotating log file (logs/combined.log) while
-// still mirroring them to the console. Independent from the in-app "Log
-// History" (LogHistory table) which is user-facing audit data.
-// ---------------------------------------------------------------------------
-
 const LOG_DIR = path.join(__dirname, "..", "..", "logs");
 const LOG_FILE = path.join(LOG_DIR, "combined.log");
+const LOG_MAX_BYTES = 1048576;
+const LOG_RETAINED_FILES = 5;
 
 if (!fs.existsSync(LOG_DIR)) {
   fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -22,25 +17,63 @@ function formatLogEntry(level, message, meta) {
   return `[${timestamp}] [${level}] ${message}${metaStr}\n`;
 }
 
+function rotatedName(dir, index) {
+  return path.join(dir, `combined.${index}.log`);
+}
+
+async function rotateCombinedLogs(dir) {
+  const target = path.join(dir, "combined.log");
+  try {
+    const stat = await fs.promises.stat(target);
+    if (stat.size < LOG_MAX_BYTES) return;
+  } catch {
+    return;
+  }
+  try {
+    try {
+      await fs.promises.unlink(rotatedName(dir, LOG_RETAINED_FILES));
+    } catch {}
+    for (let i = LOG_RETAINED_FILES - 1; i >= 1; i -= 1) {
+      try {
+        await fs.promises.rename(rotatedName(dir, i), rotatedName(dir, i + 1));
+      } catch {}
+    }
+    await fs.promises.rename(target, rotatedName(dir, 1));
+  } catch (err) {
+    process.stderr.write(`[logger] Failed to rotate log file: ${err.message}\n`);
+  }
+}
+
+async function appendLine(file, line) {
+  try {
+    await fs.promises.appendFile(file, line);
+  } catch (err) {
+    process.stderr.write(`[logger] Failed to write log file: ${err.message}\n`);
+  }
+}
+
+let writeChain = Promise.resolve();
+
+function enqueueWrite(file, line) {
+  writeChain = writeChain.then(async () => {
+    if (file === LOG_FILE) await rotateCombinedLogs(LOG_DIR);
+    await appendLine(file, line);
+  });
+  writeChain.catch(() => {});
+}
+
 function write(level, message, meta) {
   const line = formatLogEntry(level, message, meta);
 
-  // Mirror to stdout/stderr for live terminal viewing.
   if (level === "ERROR" || level === "WARN") {
     process.stderr.write(line);
   } else {
     process.stdout.write(line);
   }
 
-  // Append to the dated log file. Also keep per-day files for easy browsing.
   const day = new Date().toISOString().slice(0, 10);
-  try {
-    fs.appendFileSync(LOG_FILE, line);
-    fs.appendFileSync(path.join(LOG_DIR, `app-${day}.log`), line);
-  } catch (err) {
-    // Never let logging failures crash the request handling.
-    process.stderr.write(`[logger] Failed to write log file: ${err.message}\n`);
-  }
+  enqueueWrite(LOG_FILE, line);
+  enqueueWrite(path.join(LOG_DIR, `app-${day}.log`), line);
 }
 
 const logger = {
@@ -54,7 +87,6 @@ const logger = {
   },
 };
 
-// Convenience: HTTP request logger middleware records each incoming request.
 function requestLogger(req, res, next) {
   const startedAt = Date.now();
   res.on("finish", () => {
@@ -67,4 +99,14 @@ function requestLogger(req, res, next) {
   next();
 }
 
-module.exports = { logger, requestLogger };
+module.exports = {
+  logger,
+  requestLogger,
+  LOG_DIR,
+  LOG_FILE,
+  LOG_MAX_BYTES,
+  LOG_RETAINED_FILES,
+  formatLogEntry,
+  rotateCombinedLogs,
+  appendLine,
+};

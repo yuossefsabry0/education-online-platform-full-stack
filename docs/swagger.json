@@ -82,6 +82,45 @@
           "refreshToken": { "type": "string" }
         }
       },
+      "ChangePassword": {
+        "type": "object",
+        "required": ["currentPassword", "newPassword"],
+        "properties": {
+          "currentPassword": { "type": "string" },
+          "newPassword": { "type": "string", "minLength": 6, "maxLength": 128 }
+        }
+      },
+      "ResetRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "userType": { "type": "string", "enum": ["student", "teacher", "admin"] }
+        }
+      },
+      "ResetConfirm": {
+        "type": "object",
+        "required": ["token", "newPassword"],
+        "properties": {
+          "token": { "type": "string" },
+          "newPassword": { "type": "string", "minLength": 6, "maxLength": 128 }
+        }
+      },
+      "VerifyResend": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "userType": { "type": "string", "enum": ["student", "teacher", "admin"] }
+        }
+      },
+      "VerifyConfirm": {
+        "type": "object",
+        "required": ["token"],
+        "properties": {
+          "token": { "type": "string" }
+        }
+      },
       "ConfirmPayment": {
         "type": "object",
         "required": ["teacherId", "duration"],
@@ -199,9 +238,10 @@
     "/auth/refresh": {
       "post": {
         "tags": ["Auth"],
-        "summary": "Exchange a refresh token for a new access token",
+        "summary": "Exchange a refresh token for a new access token (rotates the refresh cookie)",
+        "description": "Reads the httpOnly refresh cookie (SameSite=Lax, Secure in production over HTTPS). With the explicit CORS allowlist and SameSite set, no separate CSRF token is introduced. Successful refresh rotates the refresh token: a new cookie value is issued and the old value is revoked; reuse of a revoked value is rejected and revokes its token family.",
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshToken" } } }
         },
         "responses": {
@@ -214,9 +254,10 @@
     "/auth/logout": {
       "post": {
         "tags": ["Auth"],
-        "summary": "Revoke a refresh token",
+        "summary": "Revoke a refresh token and clear the refresh cookie",
+        "description": "Reads the httpOnly refresh cookie when present; revokes the matching database row and clears the cookie.",
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshToken" } } }
         },
         "responses": {
@@ -225,10 +266,91 @@
         }
       }
     },
+    "/auth/password": {
+      "put": {
+        "tags": ["Auth"],
+        "summary": "Change own password (students, teachers, admins)",
+        "description": "Requires the current password. On success revokes ALL refresh tokens of the user and clears the refresh cookie; the client must log in again.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePassword" } } }
+        },
+        "responses": {
+          "200": { "description": "Password changed" },
+          "400": { "description": "Validation failed" },
+          "401": { "description": "Unauthenticated or wrong current password" }
+        }
+      }
+    },
+    "/auth/password-reset/request": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request a password-reset token",
+        "description": "Always returns the same generic message whether or not the email exists (no account enumeration). A single-use token valid for 1 hour is emailed when exactly one account matches; prior pending tokens are invalidated.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResetRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Generic acknowledgement" },
+          "400": { "description": "Validation failed" }
+        }
+      }
+    },
+    "/auth/password-reset/confirm": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reset password with a single-use token",
+        "description": "Consumes the token (reuse rejected), updates the password and revokes ALL refresh tokens of the user.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResetConfirm" } } }
+        },
+        "responses": {
+          "200": { "description": "Password reset" },
+          "400": { "description": "Validation failed" },
+          "401": { "description": "Invalid or expired reset token" }
+        }
+      }
+    },
+    "/auth/verify-email/resend": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Resend an email-verification token",
+        "description": "Rate limited to 5 requests per hour per IP. Always returns the same generic message (no enumeration). A new token valid for 24 hours invalidates prior pending tokens. Verification never blocks login.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VerifyResend" } } }
+        },
+        "responses": {
+          "200": { "description": "Generic acknowledgement" },
+          "400": { "description": "Validation failed" },
+          "429": { "description": "Too many requests" }
+        }
+      }
+    },
+    "/auth/verify-email/confirm": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Verify an email with a single-use token",
+        "description": "Marks the owning account verified (idempotent success for already-verified accounts) and consumes the token.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VerifyConfirm" } } }
+        },
+        "responses": {
+          "200": { "description": "Email verified" },
+          "400": { "description": "Validation failed" },
+          "401": { "description": "Invalid or expired verification token" }
+        }
+      }
+    },
     "/contact": {
       "get": {
         "tags": ["Contact"],
         "summary": "Contact information",
+        "description": "Returns the CONTACT_EMAIL environment value (development default only; production must set a real address).",
         "responses": {
           "200": { "description": "Contact email" }
         }
@@ -281,8 +403,39 @@
       "get": {
         "tags": ["User"],
         "summary": "Current user profile plus their active subscription roles",
+        "description": "Returns { user, activeRoles, teachers }. activeRoles is unchanged (raw SUB{id} role strings). teachers is an additive detail array resolving each active role to { id, name, subject, gradeClass }; empty for non-students.",
         "security": [{ "BearerAuth": [] }],
         "responses": { "200": { "description": "Profile and activeRoles" } }
+      }
+    },
+    "/user/history": {
+      "get": {
+        "tags": ["User"],
+        "summary": "Own subscription and activity history (student only)",
+        "description": "Returns { subscriptions: { items, pagination }, events: { items, pagination } }. Subscription items expose id, duration, price, startDate, endDate, status, teacherRole and teacher { id, name, subject }. Events expose id, actionType, targetId, timestamp and details. No other users' data is included.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number (default 1)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" }
+        ],
+        "responses": {
+          "200": { "description": "Paginated own history" },
+          "401": { "description": "Authentication required" },
+          "403": { "description": "Students only" }
+        }
+      }
+    },
+    "/subscriptions/mine": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "summary": "Calling student's active subscriptions with teacher details (student only)",
+        "description": "Returns { subscriptions: [{ id, duration, startDate, endDate, status, teacher: { id, name, subject, gradeClass } }] }. Only subscriptions satisfying the active rule (status not EXPIRED/CANCELLED and endDate in the future) are returned. Subscriptions whose teacher was soft-deleted (isActive false) are excluded from the default list; history is preserved in the database.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Active subscriptions, empty array when none" },
+          "401": { "description": "Authentication required" },
+          "403": { "description": "Only students can view subscriptions" }
+        }
       }
     },
     "/subscriptions/teacher/{teacherId}": {
@@ -313,6 +466,24 @@
         }
       }
     },
+    "/subscriptions/{subscriptionId}/cancel": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "summary": "Cancel own subscription (student only; history preserved)",
+        "description": "Only the owning student may cancel. Valid transition ACTIVE to CANCELLED; other states return 409. A cancellation notification is recorded exactly once.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "subscriptionId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Subscription cancelled" },
+          "401": { "description": "Authentication required" },
+          "403": { "description": "Not the owning student" },
+          "404": { "description": "Not found" },
+          "409": { "description": "Not active" }
+        }
+      }
+    },
     "/content/teacher/{teacherId}": {
       "get": {
         "tags": ["Content"],
@@ -331,14 +502,36 @@
       "get": {
         "tags": ["Content"],
         "summary": "One content section (lectures | lesson-content | homework)",
+        "description": "Paginated list ordered by createdAt ASC. Omitting page/limit returns page 1 with limit 10. q filters titles (case-insensitive contains). Response keeps section content and adds a pagination envelope.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "section", "in": "path", "required": true, "schema": { "type": "string", "enum": ["lectures", "lesson-content", "homework"] } }
+          { "name": "section", "in": "path", "required": true, "schema": { "type": "string", "enum": ["lectures", "lesson-content", "homework"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number (default 1)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" },
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Title search text" }
         ],
         "responses": {
-          "200": { "description": "Section content" },
+          "200": { "description": "Section content with pagination" },
+          "400": { "description": "Invalid page/limit" },
           "404": { "description": "Unknown section" }
+        }
+      }
+    },
+    "/files/{name}": {
+      "get": {
+        "tags": ["Content"],
+        "summary": "Download an uploaded file by generated name",
+        "description": "Authorization matches the owning content gates: admins allow, owning teachers allow, students require an active subscription to the owning teacher's published content.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "File bytes with the stored content type" },
+          "401": { "description": "Authentication required" },
+          "403": { "description": "Access denied" },
+          "404": { "description": "File not found" }
         }
       }
     },
@@ -346,7 +539,13 @@
       "get": {
         "tags": ["Teacher Dashboard"],
         "summary": "Teacher's own dashboard with their content (teacher role)",
+        "description": "Content list ordered by createdAt ASC with page/limit/q support (defaults page 1, limit 10, max 50) and a pagination envelope; the paginated items are grouped into sections. q filters titles (case-insensitive contains).",
         "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number (default 1)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" },
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Title search text" }
+        ],
         "responses": { "200": { "description": "Dashboard" } }
       }
     },
@@ -376,6 +575,23 @@
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddContent" } } }
         },
         "responses": { "201": { "description": "Content created" } }
+      }
+    },
+    "/teacher/dashboard/content/upload": {
+      "post": {
+        "tags": ["Teacher Dashboard"],
+        "summary": "Upload a file for own content (teacher role)",
+        "description": "Multipart form with a single 'file' field. Allowed types: png, jpg/jpeg, webp, gif, pdf, mp4; max 10MB; stored under a generated random name. Returns { fileUrl, fileName, mimeType, size } where fileUrl is a same-origin /api/files/<name> path.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "multipart/form-data": { "schema": { "type": "object", "properties": { "file": { "type": "string", "format": "binary" } } } } }
+        },
+        "responses": {
+          "201": { "description": "File stored" },
+          "400": { "description": "Unsupported type or missing file" },
+          "413": { "description": "File too large" }
+        }
       }
     },
     "/teacher/dashboard/content/{contentId}": {
@@ -499,6 +715,26 @@
         "responses": { "201": { "description": "Content created" } }
       }
     },
+    "/admin/teachers/{teacherId}/content/upload": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Upload a file for a teacher's content (admin only)",
+        "description": "Multipart form with a single 'file' field. Allowed types: png, jpg/jpeg, webp, gif, pdf, mp4; max 10MB; stored under a generated random name. Returns { fileUrl, fileName, mimeType, size }.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "multipart/form-data": { "schema": { "type": "object", "properties": { "file": { "type": "string", "format": "binary" } } } } }
+        },
+        "responses": {
+          "201": { "description": "File stored" },
+          "400": { "description": "Unsupported type or missing file" },
+          "413": { "description": "File too large" }
+        }
+      }
+    },
     "/admin/teachers/{teacherId}/content/{contentId}": {
       "put": {
         "tags": ["Admin"],
@@ -529,6 +765,7 @@
       "get": {
         "tags": ["Admin"],
         "summary": "In-app Log History (admin only). Note: separate from the server-side developer log file.",
+        "description": "Also exposes subscription notification records: SUBSCRIPTION_EXPIRY_NOTIFIED and SUBSCRIPTION_CANCEL_NOTIFIED with details { email, status: sent|failed|skipped }. Expiry notifications are claimed idempotently per subscription and retried on each 60s job pass until sent; cancellations notify once inline with failures recorded; missing recipients are recorded as skipped.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           { "name": "actionType", "in": "query", "schema": { "type": "string" } },
@@ -545,6 +782,7 @@
       "post": {
         "tags": ["Admin"],
         "summary": "Cancel a user's active subscription (admin only)",
+        "description": "Valid transition ACTIVE to CANCELLED via a conditional update. A cancellation notification is recorded exactly once.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           { "name": "subscriptionId", "in": "path", "required": true, "schema": { "type": "integer" } }

@@ -29,7 +29,7 @@ export default function TeacherDashboard() {
     setError(null);
     try {
       const [dash, subs, inc] = await Promise.all([
-        endpoints.teacherDashboard(),
+        endpoints.teacherDashboard({ limit: 50 }),
         endpoints.teacherSubscribers(),
         endpoints.teacherIncome(),
       ]);
@@ -78,7 +78,7 @@ export default function TeacherDashboard() {
       }
       setForm(emptyForm);
       setEditingId(null);
-      const dash = await endpoints.teacherDashboard();
+      const dash = await endpoints.teacherDashboard({ limit: 50 });
       setDashboard(dash);
     } catch (err) {
       setFormError(toApiError(err));
@@ -91,10 +91,24 @@ export default function TeacherDashboard() {
     if (!window.confirm("Delete this content item?")) return;
     try {
       await endpoints.teacherDeleteContent(contentId);
-      const dash = await endpoints.teacherDashboard();
+      const dash = await endpoints.teacherDashboard({ limit: 50 });
       setDashboard(dash);
     } catch (err) {
       setFormError(toApiError(err));
+    }
+  }
+
+  async function handleFileSelect(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setFormError(null);
+    try {
+      const saved = await endpoints.teacherUploadContent(file);
+      setForm((f) => ({ ...f, fileUrl: saved.fileUrl }));
+    } catch (err) {
+      setFormError(toApiError(err));
+    } finally {
+      e.target.value = "";
     }
   }
 
@@ -173,6 +187,10 @@ export default function TeacherDashboard() {
             <label className="field">
               <span>File URL (optional)</span>
               <input type="text" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />
+            </label>
+            <label className="field">
+              <span>Upload file (optional, replaces File URL)</span>
+              <input type="file" onChange={handleFileSelect} />
             </label>
             <div className="btn-row">
               <button type="submit" className="btn btn-dark" disabled={saving}>

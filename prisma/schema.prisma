@@ -51,10 +51,14 @@ model Student {
   username      String         @unique
   email         String         @unique @db.VarChar(254)
   password      String
+  emailVerified Boolean        @default(false)
+  verifiedAt    DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   subscriptions Subscription[]
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 
@@ -76,11 +80,15 @@ model Teacher {
   price1Year   Decimal            @db.Decimal(10, 2)
   // Soft-delete flag (mark deleted/inactive without removing the row)
   isActive     Boolean            @default(true)
+  emailVerified Boolean           @default(false)
+  verifiedAt   DateTime?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   subscriptions Subscription[]
   contents     TeacherContent[]
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 // Admin — its own separate table (seeded directly, no public route)
@@ -91,9 +99,13 @@ model Admin {
   username      String         @unique
   email         String         @unique @db.VarChar(254)
   password      String
+  emailVerified Boolean        @default(false)
+  verifiedAt    DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 
@@ -113,6 +125,8 @@ model Subscription {
   startDate  DateTime
   endDate    DateTime
   status     SubscriptionStatus   @default(ACTIVE)
+  expiryNotifiedAt DateTime?
+  cancelNotifiedAt DateTime?
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
 
@@ -162,13 +176,57 @@ model TeacherContent {
 
 model RefreshToken {
   id        Int            @id @default(autoincrement())
-  token     String         @unique
+  token     String         @unique @db.VarChar(512)
+  ownerType TokenOwnerType
+  studentId Int?
+  teacherId Int?
+  adminId   Int?
+  familyId  String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime       @default(now())
+
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  admin   Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([ownerType, studentId])
+  @@index([ownerType, teacherId])
+  @@index([ownerType, adminId])
+  @@index([familyId])
+}
+
+
+model PasswordResetToken {
+  id        Int            @id @default(autoincrement())
+  tokenHash String         @unique @db.VarChar(128)
   ownerType TokenOwnerType
   studentId Int?
   teacherId Int?
   adminId   Int?
   expiresAt DateTime
-  revokedAt DateTime?
+  usedAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  admin   Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([ownerType, studentId])
+  @@index([ownerType, teacherId])
+  @@index([ownerType, adminId])
+}
+
+
+model EmailVerificationToken {
+  id        Int            @id @default(autoincrement())
+  tokenHash String         @unique @db.VarChar(128)
+  ownerType TokenOwnerType
+  studentId Int?
+  teacherId Int?
+  adminId   Int?
+  expiresAt DateTime
+  usedAt    DateTime?
   createdAt DateTime       @default(now())
 
   student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)

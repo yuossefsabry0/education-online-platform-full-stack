@@ -1,4 +1,10 @@
 const prisma = require("../db/prisma");
+const config = require("../config");
+const {
+  claimNotification,
+  unclaimNotification,
+  sendExpiryNotice,
+} = require("../utils/subscriptionNotify");
 
 // Lightweight scheduled job (setInterval) that periodically marks subscriptions
 // whose endDate has passed as EXPIRED and writes the SUBSCRIPTION_EXPIRED log
@@ -6,10 +12,32 @@ const prisma = require("../db/prisma");
 // provides immediate revocation; this job guarantees expiration is logged even
 // when no request happens to trigger it.
 
-const CHECK_INTERVAL_MS = 60 * 1000; // every 1 minute
+const CHECK_INTERVAL_MS = config.jobs.expiryIntervalMs;
 
 let intervalHandle = null;
 let running = false;
+
+async function notifyExpired(subscriptionId) {
+  if (await claimNotification(subscriptionId, "expiryNotifiedAt")) {
+    const full = await prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      select: {
+        id: true,
+        studentId: true,
+        teacherId: true,
+        teacherRole: true,
+        duration: true,
+        price: true,
+        student: { select: { id: true, name: true, email: true } },
+        teacher: { select: { id: true, name: true } },
+      },
+    });
+    const outcome = await sendExpiryNotice(full);
+    if (outcome === "failed") {
+      await unclaimNotification(subscriptionId, "expiryNotifiedAt");
+    }
+  }
+}
 
 async function runExpirationPass() {
   if (running) return;
@@ -32,6 +60,15 @@ async function runExpirationPass() {
         startDate: true,
         endDate: true,
       },
+    });
+
+    const pendingNotice = await prisma.subscription.findMany({
+      where: {
+        status: "EXPIRED",
+        endDate: { lte: now },
+        expiryNotifiedAt: null,
+      },
+      select: { id: true },
     });
 
     for (const sub of expired) {
@@ -60,6 +97,12 @@ async function runExpirationPass() {
           },
         });
       });
+
+      await notifyExpired(sub.id);
+    }
+
+    for (const sub of pendingNotice) {
+      await notifyExpired(sub.id);
     }
 
     if (expired.length > 0) {

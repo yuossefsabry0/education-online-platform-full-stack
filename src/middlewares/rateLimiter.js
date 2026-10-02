@@ -42,4 +42,9 @@ const tokenLimiter = buildLimiter({
   limit: 30,
 });
 
-module.exports = { apiLimiter, authLimiter, tokenLimiter };
+const resendLimiter = buildLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+});
+
+module.exports = { apiLimiter, authLimiter, tokenLimiter, resendLimiter, buildLimiter };

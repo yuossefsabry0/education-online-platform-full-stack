@@ -3,7 +3,10 @@ const { Prisma } = require("@prisma/client");
 const { success, error } = require("../utils/apiResponse");
 const { deriveTeacherRole } = require("../utils/teacherRole");
 const { endDateForStartDuration } = require("../utils/date");
-const { teacherIdParam } = require("../validations/subscription.schema");
+const { teacherIdParam, subscriptionIdParam, DURATIONS } = require("../validations/subscription.schema");
+const { activeSubscriptionWhere } = require("../utils/subscriptionStatus");
+const { httpError } = require("../utils/httpError");
+const { claimNotification, sendCancellationNotice } = require("../utils/subscriptionNotify");
 
 const DURATION_PRICE_FIELD = {
   ONE_MONTH: "price1Month",
@@ -76,11 +79,7 @@ function parseTeacherIdParam(raw) {
       field: issue.path.join(".") || "teacherId",
       message: issue.message,
     }));
-    const err = new Error("Validation failed");
-    err.status = 400;
-    err.code = "VALIDATION_ERROR";
-    err.details = details;
-    throw err;
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", details);
   }
   return result.data;
 }
@@ -125,8 +124,7 @@ async function showPlans(req, res, next) {
     where: {
       studentId: req.user.id,
       teacherId: teacher.id,
-      status: { notIn: ["EXPIRED", "CANCELLED"] },
-      endDate: { gt: now },
+      ...activeSubscriptionWhere(now),
     },
     select: {
       id: true,
@@ -168,6 +166,11 @@ async function showPlans(req, res, next) {
 // reused by the webhook without duplicating the transaction.
 // ---------------------------------------------------------------------------
 async function activateSubscription({ studentId, teacherId, duration }) {
+  if (!DURATIONS.includes(duration)) {
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", [
+      { field: "duration", message: `duration must be one of: ${DURATIONS.join(", ")}` },
+    ]);
+  }
   return prisma.$transaction(async (tx) => {
     const teacher = await tx.teacher.findFirst({
       where: { id: teacherId, isActive: true },
@@ -181,10 +184,7 @@ async function activateSubscription({ studentId, teacherId, duration }) {
     });
 
     if (!teacher) {
-      const err = new Error("Teacher not found");
-      err.status = 404;
-      err.code = "TEACHER_NOT_FOUND";
-      throw err;
+      throw httpError(404, "TEACHER_NOT_FOUND", "Teacher not found");
     }
 
     // A user may hold only ONE active (non-expired, non-cancelled) subscription
@@ -193,19 +193,13 @@ async function activateSubscription({ studentId, teacherId, duration }) {
       where: {
         studentId,
         teacherId,
-        status: { notIn: ["EXPIRED", "CANCELLED"] },
-        endDate: { gt: new Date() },
+        ...activeSubscriptionWhere(new Date()),
       },
       select: { id: true },
     });
 
     if (existing) {
-      const err = new Error(
-        "You already have an active subscription with this teacher."
-      );
-      err.status = 409;
-      err.code = "ACTIVE_SUBSCRIPTION_EXISTS";
-      throw err;
+      throw httpError(409, "ACTIVE_SUBSCRIPTION_EXISTS", "You already have an active subscription with this teacher.");
     }
 
     // Price is snapshotted from the teacher at the exact moment of
@@ -248,12 +242,7 @@ async function activateSubscription({ studentId, teacherId, duration }) {
       // application-level check above, the database unique constraint catches
       // the second insert. Map it to the same error the early check returns.
       if (isOneActiveSubscriptionConstraintError(err)) {
-        const conflict = new Error(
-          "You already have an active subscription with this teacher."
-        );
-        conflict.status = 409;
-        conflict.code = "ACTIVE_SUBSCRIPTION_EXISTS";
-        throw conflict;
+        throw httpError(409, "ACTIVE_SUBSCRIPTION_EXISTS", "You already have an active subscription with this teacher.");
       }
       throw err;
     }
@@ -323,4 +312,161 @@ async function confirmPayment(req, res, next) {
   }
 }
 
-module.exports = { showPlans, confirmPayment };
+// ---------------------------------------------------------------------------
+// My Subscriptions.
+// Lists the calling student's ACTIVE subscriptions with teacher details so
+// the client can render a "My Subscriptions" page. Students only.
+// ---------------------------------------------------------------------------
+async function listMine(req, res, next) {
+  try {
+    if (!isStudent(req.user)) {
+      return error(
+        res,
+        "Only students can view subscriptions",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
+    const now = new Date();
+    const subscriptions = await prisma.subscription.findMany({
+      where: {
+        studentId: req.user.id,
+        ...activeSubscriptionWhere(now),
+        teacher: { isActive: true },
+      },
+      orderBy: { startDate: "desc" },
+      select: {
+        id: true,
+        duration: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+        teacher: {
+          select: {
+            id: true,
+            name: true,
+            subject: true,
+            gradeClass: true,
+          },
+        },
+      },
+    });
+
+    return success(res, { subscriptions });
+  } catch (err) {
+    next(err);
+  }
+}
+
+function parseSubscriptionIdParam(raw) {
+  const result = subscriptionIdParam.safeParse(raw);
+  if (!result.success) {
+    const details = result.error.issues.map((issue) => ({
+      field: issue.path.join(".") || "subscriptionId",
+      message: issue.message,
+    }));
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", details);
+  }
+  return result.data;
+}
+
+async function cancelOwnSubscription({ studentId, subscriptionId }) {
+  if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", [
+      { field: "subscriptionId", message: "subscriptionId must be a positive integer" },
+    ]);
+  }
+  const existing = await prisma.subscription.findUnique({
+    where: { id: subscriptionId },
+    select: { id: true, studentId: true, status: true },
+  });
+  if (!existing) {
+    throw httpError(404, "SUBSCRIPTION_NOT_FOUND", "Subscription not found");
+  }
+  if (existing.studentId !== studentId) {
+    throw httpError(403, "FORBIDDEN", "You can only cancel your own subscriptions");
+  }
+  if (existing.status !== "ACTIVE") {
+    throw httpError(409, "SUBSCRIPTION_NOT_ACTIVE", "Subscription is not active and cannot be cancelled");
+  }
+  const updated = await prisma.subscription.updateMany({
+    where: { id: subscriptionId, studentId, status: "ACTIVE" },
+    data: { status: "CANCELLED" },
+  });
+  if (updated.count !== 1) {
+    throw httpError(409, "SUBSCRIPTION_NOT_ACTIVE", "Subscription is not active and cannot be cancelled");
+  }
+  const cancelled = await prisma.subscription.findUnique({
+    where: { id: subscriptionId },
+    select: {
+      id: true,
+      studentId: true,
+      teacherId: true,
+      teacherRole: true,
+      duration: true,
+      price: true,
+      startDate: true,
+      endDate: true,
+      status: true,
+      student: { select: { id: true, name: true, email: true } },
+      teacher: { select: { id: true, name: true } },
+    },
+  });
+  await prisma.logHistory.create({
+    data: {
+      actionType: "SUBSCRIPTION_CANCELLED",
+      actorId: String(studentId),
+      actorType: "STUDENT",
+      targetId: String(subscriptionId),
+      details: {
+        studentId: cancelled.studentId,
+        teacherId: cancelled.teacherId,
+        teacherRole: cancelled.teacherRole,
+        duration: cancelled.duration,
+        price: cancelled.price.toString(),
+      },
+    },
+  });
+  if (await claimNotification(subscriptionId, "cancelNotifiedAt")) {
+    await sendCancellationNotice(cancelled);
+  }
+  return {
+    id: cancelled.id,
+    studentId: cancelled.studentId,
+    teacherId: cancelled.teacherId,
+    teacherRole: cancelled.teacherRole,
+    status: cancelled.status,
+  };
+}
+
+async function cancelMine(req, res, next) {
+  try {
+    if (!isStudent(req.user)) {
+      return error(
+        res,
+        "Only students can cancel subscriptions",
+        403,
+        "FORBIDDEN"
+      );
+    }
+    let subscriptionId;
+    try {
+      subscriptionId = parseSubscriptionIdParam(req.params.subscriptionId);
+    } catch (err) {
+      return next(err);
+    }
+    const subscription = await cancelOwnSubscription({
+      studentId: req.user.id,
+      subscriptionId,
+    });
+    return success(res, {
+      message: "Subscription cancelled.",
+      subscription,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { showPlans, confirmPayment, listMine, cancelMine, cancelOwnSubscription, activateSubscription, DURATION_PRICE_FIELD };

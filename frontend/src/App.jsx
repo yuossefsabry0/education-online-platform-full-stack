@@ -8,15 +8,20 @@ import AdminLogs from "./pages/AdminLogs.jsx";
 import AdminSubscribers from "./pages/AdminSubscribers.jsx";
 import AdminTeacherDetail from "./pages/AdminTeacherDetail.jsx";
 import AdminTeachers from "./pages/AdminTeachers.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
 import Home from "./pages/Home.jsx";
 import Login from "./pages/Login.jsx";
+import MyHistory from "./pages/MyHistory.jsx";
+import MySubscriptions from "./pages/MySubscriptions.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import Profile from "./pages/Profile.jsx";
 import Register from "./pages/Register.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import Subscribe from "./pages/Subscribe.jsx";
 import TeacherContent from "./pages/TeacherContent.jsx";
 import TeacherDashboard from "./pages/TeacherDashboard.jsx";
 import Teachers from "./pages/Teachers.jsx";
+import VerifyEmail from "./pages/VerifyEmail.jsx";
 
 export default function App() {
   return (
@@ -29,6 +34,9 @@ export default function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/teachers" element={<Teachers />} />
             <Route
               path="/teachers/:teacherId/subscribe"
@@ -43,6 +51,22 @@ export default function App() {
               element={
                 <ProtectedRoute allow={["student"]}>
                   <TeacherContent />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-subscriptions"
+              element={
+                <ProtectedRoute allow={["student"]}>
+                  <MySubscriptions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute allow={["student"]}>
+                  <MyHistory />
                 </ProtectedRoute>
               }
             />

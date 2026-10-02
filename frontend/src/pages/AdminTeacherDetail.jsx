@@ -124,6 +124,20 @@ export default function AdminTeacherDetail() {
     }
   }
 
+  async function handleUploadSelect(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const saved = await endpoints.adminUploadContent(teacherId, file);
+      setContentForm({ ...contentForm, fileUrl: saved.fileUrl });
+      flashOk("File uploaded.");
+    } catch (err) {
+      flashErr(err);
+    } finally {
+      e.target.value = "";
+    }
+  }
+
   if (loading) return <div className="page"><Loader label="Loading teacher..." /></div>;
   if (error) {
     return (
@@ -226,6 +240,9 @@ export default function AdminTeacherDetail() {
         </label>
         <label className="field"><span>File URL</span>
           <input type="text" value={contentForm.fileUrl} onChange={(e) => setContentForm({ ...contentForm, fileUrl: e.target.value })} />
+        </label>
+        <label className="field"><span>Upload file (optional, replaces File URL)</span>
+          <input type="file" onChange={handleUploadSelect} />
         </label>
         <div className="btn-row">
           <button type="submit" className="btn btn-dark">{editingContentId ? "Save" : "Add"}</button>

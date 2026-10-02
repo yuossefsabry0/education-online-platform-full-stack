@@ -7,6 +7,7 @@ const {
   editContentSchema,
 } = require("../validations/content.schema");
 const contentController = require("../controllers/content.controller");
+const uploadController = require("../controllers/upload.controller");
 
 const router = Router();
 
@@ -41,6 +42,13 @@ router.put(
 router.delete(
   "/dashboard/content/:contentId",
   contentController.deleteContent
+);
+
+// Upload a file for the teacher's own content (returns a fileUrl).
+router.post(
+  "/dashboard/content/upload",
+  uploadController.uploadSingle,
+  uploadController.uploadTeacherFile
 );
 
 module.exports = router;

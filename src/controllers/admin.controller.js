@@ -1,6 +1,11 @@
 const bcrypt = require("bcryptjs");
 const prisma = require("../db/prisma");
+const config = require("../config");
 const { success, error } = require("../utils/apiResponse");
+const { activeSubscriptionWhere } = require("../utils/subscriptionStatus");
+const { httpError } = require("../utils/httpError");
+const { toMoneyString } = require("../utils/money");
+const { claimNotification, sendCancellationNotice } = require("../utils/subscriptionNotify");
 const {
   idParam,
   subscribersQuerySchema,
@@ -8,7 +13,7 @@ const {
   logsQuerySchema,
 } = require("../validations/admin.schema");
 
-const PASSWORD_SALT_ROUNDS = 10;
+const PASSWORD_SALT_ROUNDS = config.security.bcryptRounds;
 
 const SUBSCRIBER_SELECT = {
   id: true,
@@ -45,11 +50,7 @@ function parseSchema(schema, raw) {
       field: issue.path.join(".") || "value",
       message: issue.message,
     }));
-    const err = new Error("Validation failed");
-    err.status = 400;
-    err.code = "VALIDATION_ERROR";
-    err.details = details;
-    throw err;
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", details);
   }
   return result.data;
 }
@@ -180,8 +181,11 @@ async function getTotalIncome(req, res, next) {
       _count: true,
     });
 
+    const raw = aggregation._sum.price;
+    const totalIncome = toMoneyString(raw === null || raw === undefined ? null : raw.toString());
+
     return success(res, {
-      totalIncome: aggregation._sum.price,
+      totalIncome,
       totalPayments: aggregation._count,
     });
   } catch (err) {
@@ -394,8 +398,7 @@ async function deleteTeacher(req, res, next) {
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         teacherId,
-        status: "ACTIVE",
-        endDate: { gt: now },
+        ...activeSubscriptionWhere(now),
       },
       select: { id: true },
     });
@@ -651,15 +654,29 @@ async function cancelSubscription(req, res, next) {
       );
     }
 
-    const cancelled = await prisma.subscription.update({
-      where: { id: subscriptionId },
+    const updated = await prisma.subscription.updateMany({
+      where: { id: subscriptionId, status: "ACTIVE" },
       data: { status: "CANCELLED" },
+    });
+    if (updated.count !== 1) {
+      return error(
+        res,
+        "Subscription is not active and cannot be cancelled",
+        409,
+        "SUBSCRIPTION_NOT_ACTIVE"
+      );
+    }
+
+    const cancelled = await prisma.subscription.findUnique({
+      where: { id: subscriptionId },
       select: {
         id: true,
         studentId: true,
         teacherId: true,
         teacherRole: true,
         status: true,
+        student: { select: { id: true, name: true, email: true } },
+        teacher: { select: { id: true, name: true } },
       },
     });
 
@@ -680,6 +697,10 @@ async function cancelSubscription(req, res, next) {
         },
       },
     });
+
+    if (await claimNotification(subscriptionId, "cancelNotifiedAt")) {
+      await sendCancellationNotice(cancelled);
+    }
 
     return success(res, {
       message:

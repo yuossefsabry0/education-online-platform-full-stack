@@ -1,5 +1,6 @@
 const prisma = require("../db/prisma");
 const { success } = require("../utils/apiResponse");
+const { httpError } = require("../utils/httpError");
 const { normalizeForMatch, levenshtein } = require("../utils/textSearch");
 const {
   listTeachersQuerySchema,
@@ -48,11 +49,7 @@ function parseQuery(schema, raw) {
       field: issue.path.join(".") || "query",
       message: issue.message,
     }));
-    const err = new Error("Validation failed");
-    err.status = 400;
-    err.code = "VALIDATION_ERROR";
-    err.details = details;
-    throw err;
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", details);
   }
   return result.data;
 }
@@ -141,12 +138,25 @@ async function searchTeachers(req, res) {
 
   if (q) {
     const tokens = normalizeForMatch(q).split(/\s+/).filter(Boolean);
-    const where = {
-      ...whereBase,
-      AND: tokens.map((token) => ({ name: { contains: token } })),
-    };
-
-    total = await prisma.teacher.count({ where });
+    const candidates = await prisma.teacher.findMany({
+      where: whereBase,
+      select: { ...select, name: true },
+    });
+    const matched = candidates.filter((t) => {
+      const n = normalizeForMatch(t.name || "");
+      return tokens.every((tok) => n.includes(tok));
+    });
+    const dir = query.sortOrder === "desc" ? -1 : 1;
+    const key = query.sortBy;
+    matched.sort((a, b) => {
+      const av = a[key];
+      const bv = b[key];
+      if (av === bv) return a.id - b.id;
+      if (av === undefined || av === null) return 1;
+      if (bv === undefined || bv === null) return -1;
+      return String(av).localeCompare(String(bv)) * dir || a.id - b.id;
+    });
+    total = matched.length;
 
     if (total === 0) {
       const fuzzy = await fuzzyMatchTeachers({
@@ -158,13 +168,8 @@ async function searchTeachers(req, res) {
       teachers = fuzzy.items;
       total = fuzzy.total;
     } else {
-      teachers = await prisma.teacher.findMany({
-        where,
-        select,
-        orderBy: { [query.sortBy]: query.sortOrder },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      });
+      const start = (query.page - 1) * query.limit;
+      teachers = matched.slice(start, start + query.limit);
     }
   }
 

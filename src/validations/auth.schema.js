@@ -38,7 +38,58 @@ const loginSchema = z.object({
 const refreshTokenSchema = z.object({
   refreshToken: z
     .string({ error: "Refresh token is required" })
-    .min(1, "Refresh token is required"),
+    .min(1, "Refresh token is required")
+    .optional(),
 });
 
-module.exports = { registerSchema, loginSchema, refreshTokenSchema };
+const passwordValue = z
+  .string({ error: "Password is required" })
+  .min(6, "Password must be at least 6 characters")
+  .max(128, "Password must be at most 128 characters");
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string({ error: "Current password is required" }).min(1, "Current password is required"),
+  newPassword: passwordValue,
+});
+
+const resetRequestSchema = z.object({
+  userType: z.enum(["student", "teacher", "admin"], {
+    error: "userType must be one of: student, teacher, admin",
+  }).optional(),
+  email: z
+    .string({ error: "Email is required" })
+    .min(1, "Email is required")
+    .email("Invalid email address")
+    .max(254, "Email must be at most 254 characters"),
+});
+
+const resetConfirmSchema = z.object({
+  token: z.string({ error: "Reset token is required" }).min(1, "Reset token is required"),
+  newPassword: passwordValue,
+});
+
+const verifyRequestSchema = z.object({
+  userType: z.enum(["student", "teacher", "admin"], {
+    error: "userType must be one of: student, teacher, admin",
+  }).optional(),
+  email: z
+    .string({ error: "Email is required" })
+    .min(1, "Email is required")
+    .email("Invalid email address")
+    .max(254, "Email must be at most 254 characters"),
+});
+
+const verifyConfirmSchema = z.object({
+  token: z.string({ error: "Verification token is required" }).min(1, "Verification token is required"),
+});
+
+module.exports = {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+  changePasswordSchema,
+  resetRequestSchema,
+  resetConfirmSchema,
+  verifyRequestSchema,
+  verifyConfirmSchema,
+};
