@@ -32,7 +32,7 @@ const loginSchema = z.object({
     error: "userType must be one of: student, teacher, admin",
   }).optional(),
   username: z.string({ error: "Username is required" }).min(1, "Username is required"),
-  password: z.string({ error: "Password is required" }).min(1, "Password is required"),
+  password: z.string({ error: "Password is required" }).min(1, "Password is required").max(128, "Password must be at most 128 characters"),
 });
 
 const refreshTokenSchema = z.object({

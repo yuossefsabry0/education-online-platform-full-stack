@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { endpoints, toApiError } from "../api/client.js";
 
@@ -6,8 +6,10 @@ export default function VerifyEmail() {
   const [params] = useSearchParams();
   const [token, setToken] = useState(params.get("token") || "");
   const [email, setEmail] = useState("");
+  const [userType, setUserType] = useState("");
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState(null);
+  const attempted = useRef(false);
 
   async function confirm(value) {
     setStatus("working");
@@ -24,15 +26,19 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     const initial = params.get("token") || "";
-    if (initial) confirm(initial);
-  }, []);
+    if (initial && !attempted.current) {
+      attempted.current = true;
+      confirm(initial);
+    }
+  }, [params]);
 
   async function resend(e) {
     e.preventDefault();
     setStatus("working");
     setMessage(null);
     try {
-      const data = await endpoints.resendVerification({ email });
+      const body = userType ? { email, userType } : { email };
+      const data = await endpoints.resendVerification(body);
       setMessage(data.message || "If an account exists for this email, a verification token has been sent.");
       setStatus("done");
     } catch (err) {
@@ -62,6 +68,15 @@ export default function VerifyEmail() {
           <label className="field">
             <span>Email</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+          </label>
+          <label className="field">
+            <span>Account type (optional, helps when one email is shared)</span>
+            <select value={userType} onChange={(e) => setUserType(e.target.value)}>
+              <option value="">Auto-detect</option>
+              <option value="student">Student</option>
+              <option value="teacher">Teacher</option>
+              <option value="admin">Admin</option>
+            </select>
           </label>
           <button type="submit" className="btn btn-ghost btn-block">Resend verification token</button>
         </form>

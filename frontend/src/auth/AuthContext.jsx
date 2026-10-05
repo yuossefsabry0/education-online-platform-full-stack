@@ -5,6 +5,7 @@ import {
   endpoints,
   getAccessToken,
   getStoredUser,
+  refreshAccessTokenOnce,
   setSession,
   toApiError,
 } from "../api/client.js";
@@ -23,9 +24,17 @@ export function AuthProvider({ children }) {
       try {
         if (!getAccessToken()) {
           try {
-            await endpoints.refresh();
-          } catch {
-            if (stored) {
+            // Single-flight refresh shared with the api interceptor: the backend
+            // rotates single-use refresh tokens (family revoked on reuse), so two
+            // concurrent rotations on page reload logged the user out.
+            await refreshAccessTokenOnce();
+            const refreshedUser = getStoredUser();
+            if (refreshedUser && !cancelled) setUser(refreshedUser);
+          } catch (err) {
+            const status = err && err.response ? err.response.status : null;
+            // Only a definitive rejection ends the session here; transient
+            // failures keep the stored user so refresh doesn't log out.
+            if ((status === 400 || status === 401) && stored) {
               clearSession();
               if (!cancelled) setUser(null);
             }
@@ -41,8 +50,11 @@ export function AuthProvider({ children }) {
         } else if (!cancelled && !stored) {
           setUser(null);
         }
-      } catch {
-        if (!cancelled) {
+      } catch (err) {
+        // Only a definitive 401 ends the session here (the interceptor already
+        // retried refresh); transient failures must not log the user out.
+        const status = err && err.response ? err.response.status : null;
+        if (!cancelled && status === 401) {
           clearSession();
           setUser(null);
         }

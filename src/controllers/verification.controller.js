@@ -84,10 +84,17 @@ async function resendVerification(req, res, next) {
 async function confirmVerification(req, res, next) {
   try {
     const { token } = req.body;
+    const claimed = await prisma.emailVerificationToken.updateMany({
+      where: { tokenHash: hashToken(token), usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    if (claimed.count !== 1) {
+      return error(res, "Invalid or expired verification token", 401, "INVALID_VERIFICATION_TOKEN");
+    }
     const stored = await prisma.emailVerificationToken.findUnique({
       where: { tokenHash: hashToken(token) },
     });
-    if (!stored || stored.usedAt || stored.expiresAt <= new Date()) {
+    if (!stored || stored.expiresAt <= new Date()) {
       return error(res, "Invalid or expired verification token", 401, "INVALID_VERIFICATION_TOKEN");
     }
     const userType =

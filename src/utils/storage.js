@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
+const { logger } = require("./logger");
 
 const ALLOWED_UPLOADS = {
   ".png": "image/png",
@@ -48,6 +49,31 @@ function storedNameForUrl(fileUrl) {
   return STORED_NAME_PATTERN.test(name) ? name : null;
 }
 
+function sniffKind(buffer) {
+  try {
+    if (!Buffer.isBuffer(buffer) || buffer.length < 4) return "unknown";
+    if (buffer.length >= 8 && buffer[0] === 137 && buffer[1] === 80 && buffer[2] === 78 && buffer[3] === 71 && buffer[4] === 13 && buffer[5] === 10 && buffer[6] === 26 && buffer[7] === 10) return "png";
+    if (buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return "jpg";
+    if (buffer[0] === 71 && buffer[1] === 73 && buffer[2] === 70 && buffer[3] === 56) return "gif";
+    if (buffer.length >= 12 && buffer[0] === 82 && buffer[1] === 73 && buffer[2] === 70 && buffer[3] === 70 && buffer[8] === 87 && buffer[9] === 69 && buffer[10] === 66 && buffer[11] === 80) return "webp";
+    if (buffer[0] === 37 && buffer[1] === 80 && buffer[2] === 68 && buffer[3] === 70) return "pdf";
+    if (buffer.length >= 8 && buffer[4] === 102 && buffer[5] === 116 && buffer[6] === 121 && buffer[7] === 112) return "mp4";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function expectedKindForExt(ext) {
+  if (ext === ".png") return "png";
+  if (ext === ".jpg" || ext === ".jpeg") return "jpg";
+  if (ext === ".gif") return "gif";
+  if (ext === ".webp") return "webp";
+  if (ext === ".pdf") return "pdf";
+  if (ext === ".mp4") return "mp4";
+  return "unknown";
+}
+
 async function saveUpload(buffer, originalName, mimeType) {
   const ext = extensionOf(originalName);
   if (!ALLOWED_UPLOADS[ext] || ALLOWED_UPLOADS[ext] !== mimeType) {
@@ -67,6 +93,19 @@ async function saveUpload(buffer, originalName, mimeType) {
     err.status = 413;
     err.code = "FILE_TOO_LARGE";
     throw err;
+  }
+  try {
+    const detected = sniffKind(buffer);
+    const expected = expectedKindForExt(ext);
+    if (detected !== expected) {
+      logger.warn("[upload] Magic-byte mismatch (rejected)", { ext, expected, detected, size: buffer.length });
+      const err = new Error("Unsupported file type");
+      err.status = 400;
+      err.code = "UNSUPPORTED_FILE_TYPE";
+      throw err;
+    }
+  } catch (sniffErr) {
+    if (sniffErr && sniffErr.code === "UNSUPPORTED_FILE_TYPE") throw sniffErr;
   }
   ensureRoot();
   const name = `${crypto.randomBytes(16).toString("hex")}${ext}`;

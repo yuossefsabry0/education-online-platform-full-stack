@@ -34,6 +34,10 @@ export default function Home() {
     };
   }, []);
 
+  function scrollToPlans() {
+    document.getElementById("subscription-plans")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="page">
       <section className="hero">
@@ -68,7 +72,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-media img-zoom">
-          <SafeImg className="zoom-img" src={HERO_IMG} alt="Students learning together on campus" label="Education System" eager />
+          <SafeImg className="zoom-img" src={HERO_IMG} alt="Placeholder students learning together on campus" label="Education System" eager />
         </div>
       </section>
 
@@ -77,7 +81,7 @@ export default function Home() {
         <div className="cards-3">
           <div className="card img-zoom">
             <div className="card-media">
-              <SafeImg className="zoom-img" src={STUDY_IMG} alt="Student taking notes while studying" label="Discover teachers" />
+              <SafeImg className="zoom-img" src={STUDY_IMG} alt="Placeholder student taking notes while studying" label="Discover teachers" />
             </div>
             <h3>1. Discover teachers</h3>
             <p className="muted">Search verified teachers by name, subject, and grade.</p>
@@ -87,17 +91,28 @@ export default function Home() {
           </div>
           <div className="card img-zoom">
             <div className="card-media">
-              <SafeImg className="zoom-img" src={CLASS_IMG} alt="Teacher leading a classroom lesson" label="Subscribe" />
+              <SafeImg className="zoom-img" src={CLASS_IMG} alt="Placeholder teacher leading a classroom lesson" label="Subscribe" />
             </div>
             <h3>2. Subscribe</h3>
             <p className="muted">Pick a plan — 1, 3, 6, or 12 months — and confirm payment.</p>
-            <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/teachers")}>
-              View plans
-            </button>
+            {isAuthenticated && userType === "student" ? (
+              <div className="btn-row">
+                <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/my-subscriptions")}>
+                  My subscriptions
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={scrollToPlans}>
+                  How plans work
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="btn btn-dark btn-sm" onClick={scrollToPlans}>
+                See how plans work
+              </button>
+            )}
           </div>
           <div className="card img-zoom">
             <div className="card-media">
-              <SafeImg className="zoom-img" src={ONLINE_IMG} alt="Student learning online with a laptop" label="Learn" />
+              <SafeImg className="zoom-img" src={ONLINE_IMG} alt="Placeholder student learning online with a laptop" label="Learn" />
             </div>
             <h3>3. Learn</h3>
             <p className="muted">Unlock lectures, lesson content, and homework for your teachers.</p>
@@ -111,6 +126,51 @@ export default function Home() {
               </button>
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="section" id="subscription-plans" aria-label="Subscription plans">
+        <h2>Subscription plans</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Each teacher offers 1, 3, 6, and 12-month plans with their own prices. Pick a teacher to see
+          exact prices, then confirm payment to unlock their lectures, lesson content, and homework.
+        </p>
+        <div className="cards-3">
+          {[
+            { label: "1 month", hint: "Flexible start, renew monthly." },
+            { label: "3 months", hint: "A full term of guided learning." },
+            { label: "6 months", hint: "Steady progress across two terms." },
+            { label: "12 months", hint: "Best value for the full year." },
+          ].map((plan) => (
+            <div key={plan.label} className="card">
+              <h3 style={{ marginTop: 0 }}>{plan.label}</h3>
+              <p className="muted">{plan.hint}</p>
+            </div>
+          ))}
+        </div>
+        <div className="btn-row">
+          {isAuthenticated && userType === "student" ? (
+            <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/my-subscriptions")}>
+              Go to my subscriptions
+            </button>
+          ) : isAuthenticated && userType === "teacher" ? (
+            <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/teacher/dashboard")}>
+              Go to my dashboard
+            </button>
+          ) : isAuthenticated && userType === "admin" ? (
+            <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/admin/dashboard")}>
+              Go to admin dashboard
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/teachers")}>
+                Choose a teacher to see prices
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate("/register")}>
+                Create account
+              </button>
+            </>
+          )}
         </div>
       </section>
 

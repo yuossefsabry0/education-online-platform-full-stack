@@ -49,6 +49,8 @@ async function seedAdmin() {
       username: ADMIN.username,
       email: ADMIN.email,
       password: await hash(ADMIN.password),
+      emailVerified: true,
+      verifiedAt: new Date(),
     },
   });
   return ADMIN;
@@ -59,6 +61,8 @@ async function seedTeacher(def) {
     data: {
       ...def,
       password: await hash(def.password),
+      emailVerified: true,
+      verifiedAt: new Date(),
     },
     select: {
       id: true,
@@ -87,6 +91,8 @@ async function seedBaseFixtures() {
 async function cleanupDatabase() {
   // Order matters because of foreign keys: children before parents.
   await prisma.refreshToken.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.emailVerificationToken.deleteMany();
   await prisma.logHistory.deleteMany();
   await prisma.subscription.deleteMany();
   await prisma.teacherContent.deleteMany();

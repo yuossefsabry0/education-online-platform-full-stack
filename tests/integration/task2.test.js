@@ -2,6 +2,7 @@ const request = require("supertest");
 const bcrypt = require("bcryptjs");
 const app = require("../../src/app");
 const prisma = require("../../src/db/prisma");
+const mailer = require("../../src/utils/mailer");
 const config = require("../../src/config");
 
 function expectSuccessShape(res) {
@@ -51,6 +52,12 @@ beforeAll(async () => {
     email: "t2me_student@test.dev",
     password: "student123",
   });
+  const out = mailer.getOutbox();
+  const entry = [...out].reverse().find((e) => e.to === "t2me_student@test.dev");
+  expect(entry).toBeTruthy();
+  const m = entry && entry.text ? String(entry.text).match(/[a-f0-9]{64}/) : null;
+  expect(m).not.toBeNull();
+  await request(app).post("/api/auth/verify-email/confirm").send({ token: m[0] }).expect(200);
   const studentLogin = await request(app)
     .post("/api/auth/login")
     .send({ userType: "student", username: "t2_me_student", password: "student123" });
@@ -74,6 +81,20 @@ afterAll(async () => {
   await prisma.refreshToken.deleteMany({
     where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] },
   });
+  await prisma.passwordResetToken.deleteMany({
+    where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] },
+  });
+  await prisma.emailVerificationToken.deleteMany({
+    where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] },
+  });
+  const subs = await prisma.subscription.findMany({
+    where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] },
+    select: { id: true },
+  });
+  const subIds = subs.map((s) => String(s.id));
+  if (subIds.length) {
+    await prisma.logHistory.deleteMany({ where: { targetId: { in: subIds } } });
+  }
   await prisma.subscription.deleteMany({
     where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] },
   });

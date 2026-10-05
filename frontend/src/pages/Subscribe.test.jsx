@@ -51,7 +51,7 @@ beforeEach(() => {
 describe("Subscribe", () => {
   it("renders plans and confirms payment", async () => {
     mockPlans.mockResolvedValueOnce(plansPayload(false));
-    mockConfirm.mockResolvedValueOnce({ message: "Payment confirmed. Subscription activated." });
+    mockConfirm.mockResolvedValueOnce({ message: "Payment confirmed. Subscription activated.", subscription: { id: 9 } });
     renderAt();
     await waitFor(() => {
       expect(screen.getByText("1 Month")).toBeInTheDocument();
@@ -63,6 +63,20 @@ describe("Subscribe", () => {
     await waitFor(() => {
       expect(screen.getByText(/payment confirmed/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /go to content/i })).toBeInTheDocument();
+    });
+  });
+
+  it("shows the pending state for gateway intents with webhook completion", async () => {
+    mockPlans.mockResolvedValueOnce(plansPayload(false));
+    mockConfirm.mockResolvedValueOnce({ message: "pending", intent: { provider: "gateway", teacherId: 5, duration: "ONE_MONTH", price: "60.00" } });
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getByText("1 Month")).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("button", { name: /confirm payment/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/payment pending/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /complete via gateway webhook/i })).toBeInTheDocument();
     });
   });
 

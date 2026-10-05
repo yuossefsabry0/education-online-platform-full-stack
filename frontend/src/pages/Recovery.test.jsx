@@ -50,10 +50,11 @@ describe("password recovery pages", () => {
   it("requests a reset token with a generic confirmation", async () => {
     mockResetReq.mockResolvedValueOnce({ message: "If an account exists for this email, a reset token has been sent." });
     renderAt("/forgot-password");
-    await userEvent.type(screen.getByLabelText(/email/i), "s@test.dev");
+    await userEvent.type(screen.getByLabelText("Email"), "s@test.dev");
+    await userEvent.selectOptions(screen.getByLabelText(/account type/i), "student");
     await userEvent.click(screen.getByRole("button", { name: /send reset token/i }));
     await waitFor(() => {
-      expect(mockResetReq).toHaveBeenCalledWith({ email: "s@test.dev" });
+      expect(mockResetReq).toHaveBeenCalledWith({ email: "s@test.dev", userType: "student" });
       expect(screen.getByText(/if an account exists/i)).toBeInTheDocument();
     });
   });
@@ -83,10 +84,11 @@ describe("email verification page", () => {
   it("resends a token for an email address", async () => {
     mockVerifyResend.mockResolvedValueOnce({ message: "If an account exists for this email, a verification token has been sent." });
     renderAt("/verify-email");
-    await userEvent.type(screen.getByLabelText(/email/i), "s@test.dev");
+    await userEvent.type(screen.getByLabelText("Email"), "s@test.dev");
+    await userEvent.selectOptions(screen.getByLabelText(/account type/i), "teacher");
     await userEvent.click(screen.getByRole("button", { name: /resend verification token/i }));
     await waitFor(() => {
-      expect(mockVerifyResend).toHaveBeenCalledWith({ email: "s@test.dev" });
+      expect(mockVerifyResend).toHaveBeenCalledWith({ email: "s@test.dev", userType: "teacher" });
     });
   });
 });

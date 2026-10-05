@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { endpoints, toApiError } from "../api/client.js";
 import { EmptyState, ErrorBox, Loader } from "../components/ui.jsx";
+import { formatDate, formatPrice } from "../utils/format.js";
 
 // Single-teacher admin workspace (all real admin endpoints for one teacher):
 // - GET /api/admin/teachers/:teacherId -> { teacher (profile+contents+subscriptions), role }
@@ -164,14 +165,15 @@ export default function AdminTeacherDetail() {
       <h2>Profile</h2>
       <div className="table-wrap">
         <table className="data-table">
+          <caption className="muted small">Teacher profile</caption>
           <tbody>
             <tr><th>ID</th><td>{teacher.id}</td></tr>
             <tr><th>Username</th><td>{teacher.username}</td></tr>
             <tr><th>Email</th><td>{teacher.email}</td></tr>
             <tr><th>Subject</th><td>{teacher.subject}</td></tr>
             <tr><th>Grade</th><td>{teacher.gradeClass}</td></tr>
-            <tr><th>Prices (1m / 3m / 6m / 1y)</th>
-              <td>{[teacher.price1Month, teacher.price3Months, teacher.price6Months, teacher.price1Year].map(String).join(" / ")}</td></tr>
+            <tr><th scope="row">Prices (1m / 3m / 6m / 1y)</th>
+              <td>{[teacher.price1Month, teacher.price3Months, teacher.price6Months, teacher.price1Year].map(formatPrice).join(" / ")}</td></tr>
             <tr><th>Active</th><td>{teacher.isActive ? "Yes" : "No"}</td></tr>
           </tbody>
         </table>
@@ -184,7 +186,7 @@ export default function AdminTeacherDetail() {
             <label key={f} className="field"><span>{f} (current: {String(teacher[f] ?? "—")})</span>
               <input
                 type="text"
-                value={editForm[f] || ""}
+                value={editForm[f] ?? ""}
                 placeholder={String(teacher[f] ?? "")}
                 onChange={(e) => { setEditForm({ ...editForm, [f]: e.target.value }); setEditTouched(true); }}
               />
@@ -195,7 +197,7 @@ export default function AdminTeacherDetail() {
           <label className="field"><span>New password (optional)</span>
             <input
               type="password"
-              value={editForm.password || ""}
+              value={editForm.password ?? ""}
               autoComplete="new-password"
               onChange={(e) => { setEditForm({ ...editForm, password: e.target.value }); setEditTouched(true); }}
             />
@@ -204,7 +206,7 @@ export default function AdminTeacherDetail() {
             <label key={f} className="field"><span>{f} (current: {String(teacher[f] ?? "—")})</span>
               <input
                 type="number" min="0" step="0.01"
-                value={editForm[f] || ""}
+                value={editForm[f] ?? ""}
                 onChange={(e) => { setEditForm({ ...editForm, [f]: e.target.value }); setEditTouched(true); }}
               />
             </label>
@@ -258,7 +260,7 @@ export default function AdminTeacherDetail() {
       ) : (
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>ID</th><th>Type</th><th>Title</th><th>Published</th><th>Actions</th></tr></thead>
+            <thead><tr><th scope="col">ID</th><th scope="col">Type</th><th scope="col">Title</th><th scope="col">Published</th><th scope="col">Actions</th></tr></thead>
             <tbody>
               {contents.map((c) => (
                 <tr key={c.id}>
@@ -293,7 +295,7 @@ export default function AdminTeacherDetail() {
       ) : (
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Student</th><th>Duration</th><th>Price</th><th>Status</th><th>Period</th></tr></thead>
+            <thead><tr><th scope="col">Student</th><th scope="col">Duration</th><th scope="col">Price</th><th scope="col">Status</th><th scope="col">Period</th></tr></thead>
             <tbody>
               {(subs && subs.subscribers.length ? subs.subscribers : subscriptions.map((s) => ({
                 id: s.id, duration: s.duration, price: s.price, status: s.status,
@@ -302,8 +304,8 @@ export default function AdminTeacherDetail() {
               }))).map((s) => (
                 <tr key={s.id}>
                   <td>{s.student ? `${s.student.name} (${s.student.username})` : "—"}</td>
-                  <td>{s.duration}</td><td>{String(s.price)}</td><td>{s.status}</td>
-                  <td>{new Date(s.startDate).toLocaleDateString()} → {new Date(s.endDate).toLocaleDateString()}</td>
+                  <td>{s.duration}</td><td>{formatPrice(s.price)}</td><td>{s.status}</td>
+                  <td>{formatDate(s.startDate)} → {formatDate(s.endDate)}</td>
                 </tr>
               ))}
             </tbody>

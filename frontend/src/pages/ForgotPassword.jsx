@@ -4,6 +4,7 @@ import { endpoints, toApiError } from "../api/client.js";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
+  const [userType, setUserType] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
   const [error, setError] = useState(null);
@@ -13,7 +14,8 @@ export default function ForgotPassword() {
     setError(null);
     setLoading(true);
     try {
-      const data = await endpoints.requestPasswordReset({ email });
+      const body = userType ? { email, userType } : { email };
+      const data = await endpoints.requestPasswordReset(body);
       setDone(data.message || "If an account exists for this email, a reset token has been sent.");
     } catch (err) {
       setError(toApiError(err));
@@ -40,6 +42,15 @@ export default function ForgotPassword() {
             <label className="field">
               <span>Email</span>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+            </label>
+            <label className="field">
+              <span>Account type (optional, helps when one email is shared)</span>
+              <select value={userType} onChange={(e) => setUserType(e.target.value)}>
+                <option value="">Auto-detect</option>
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+                <option value="admin">Admin</option>
+              </select>
             </label>
             <button type="submit" className="btn btn-dark btn-block" disabled={loading}>
               {loading ? "Sending..." : "Send reset token"}

@@ -25,13 +25,17 @@ async function history(req, res, next) {
       return error(res, "Only students can view their history", 403, "FORBIDDEN");
     }
     const query = parseHistoryQuery(req.query);
-    const skip = (query.page - 1) * query.limit;
+    const subPage = query.subPage ?? query.page;
+    const eventPage = query.eventPage ?? query.page;
+    const subSkip = (subPage - 1) * query.limit;
+    const eventSkip = (eventPage - 1) * query.limit;
+    const eventWhere = { actorId: String(req.user.id), actorType: { in: ["STUDENT", "SYSTEM"] } };
     const [subTotal, subscriptions, eventTotal, events] = await Promise.all([
       prisma.subscription.count({ where: { studentId: req.user.id } }),
       prisma.subscription.findMany({
         where: { studentId: req.user.id },
         orderBy: { startDate: "desc" },
-        skip,
+        skip: subSkip,
         take: query.limit,
         select: {
           id: true,
@@ -44,13 +48,11 @@ async function history(req, res, next) {
           teacher: { select: { id: true, name: true, subject: true } },
         },
       }),
-      prisma.logHistory.count({
-        where: { actorId: String(req.user.id), actorType: "STUDENT" },
-      }),
+      prisma.logHistory.count({ where: eventWhere }),
       prisma.logHistory.findMany({
-        where: { actorId: String(req.user.id), actorType: "STUDENT" },
+        where: eventWhere,
         orderBy: { timestamp: "desc" },
-        skip,
+        skip: eventSkip,
         take: query.limit,
         select: {
           id: true,
@@ -64,11 +66,11 @@ async function history(req, res, next) {
     return success(res, {
       subscriptions: {
         items: subscriptions,
-        pagination: buildPagination(subTotal, query.page, query.limit),
+        pagination: buildPagination(subTotal, subPage, query.limit),
       },
       events: {
         items: events,
-        pagination: buildPagination(eventTotal, query.page, query.limit),
+        pagination: buildPagination(eventTotal, eventPage, query.limit),
       },
     });
   } catch (err) {

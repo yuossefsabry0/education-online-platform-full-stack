@@ -13,8 +13,11 @@ const {
   clearRefreshCookie,
   getPresentedRefreshToken,
 } = require("../utils/refreshCookie");
+const { newRawToken, hashToken } = require("../utils/singleUseToken");
+const mailer = require("../utils/mailer");
 
 const PASSWORD_SALT_ROUNDS = config.security.bcryptRounds;
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 const OWNER_TYPE_MAP = {
   student: "STUDENT",
@@ -52,6 +55,29 @@ async function register(req, res) {
     },
     select: { id: true, name: true, username: true, email: true },
   });
+
+  const raw = newRawToken();
+  await prisma.emailVerificationToken.create({
+    data: {
+      tokenHash: hashToken(raw),
+      ownerType: "STUDENT",
+      studentId: student.id,
+      expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
+    },
+  });
+  try {
+    await mailer.sendMail({
+      to: student.email,
+      subject: "Verify your email",
+      text: `Use this token within 24 hours to verify your email: ${raw}`,
+    });
+  } catch {
+    return success(
+      res,
+      { user: student, message: "Registration successful. Please log in. Verification email could not be sent, request a new token from the verify page." },
+      201
+    );
+  }
 
   return success(
     res,

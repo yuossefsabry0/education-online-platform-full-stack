@@ -6,8 +6,14 @@ const {
   addContentSchema,
   editContentSchema,
 } = require("../validations/content.schema");
+const {
+  createExamSchema,
+  updateExamSchema,
+} = require("../validations/exam.schema");
 const contentController = require("../controllers/content.controller");
+const examController = require("../controllers/exam.controller");
 const uploadController = require("../controllers/upload.controller");
+const { uploadLimiter } = require("../middlewares/rateLimiter");
 
 const router = Router();
 
@@ -47,8 +53,32 @@ router.delete(
 // Upload a file for the teacher's own content (returns a fileUrl).
 router.post(
   "/dashboard/content/upload",
+  uploadLimiter,
   uploadController.uploadSingle,
   uploadController.uploadTeacherFile
 );
+
+// Exams: teachers create timed multiple-choice exams inside the assignment
+// workflow, each optionally linked to one of their own lessons.
+router.get("/dashboard/exams", examController.listExams);
+
+router.post(
+  "/dashboard/exams",
+  validate(createExamSchema),
+  examController.createExam
+);
+
+router.get("/dashboard/exams/:examId", examController.getTeacherExam);
+
+router.put(
+  "/dashboard/exams/:examId",
+  validate(updateExamSchema),
+  examController.updateExam
+);
+
+router.delete("/dashboard/exams/:examId", examController.deleteExam);
+
+// Exam Grades: every student's name, details and score for one exam session.
+router.get("/dashboard/exams/:examId/grades", examController.getGrades);
 
 module.exports = router;

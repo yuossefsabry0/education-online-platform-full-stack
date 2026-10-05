@@ -11,6 +11,7 @@ const request = require("supertest");
 
 const app = require("../../src/app");
 const prisma = require("../../src/db/prisma");
+const mailer = require("../../src/utils/mailer");
 const { seedBaseFixtures } = require("../helpers/fixtures");
 
 // Shared mutable state populated as the file's ordered tests run.
@@ -60,7 +61,17 @@ async function registerUser(payload) {
   const res = await request(app).post("/api/auth/register").send(payload);
   expect(res.status).toBe(201);
   expectSuccessShape(res);
+  await verifyStudentEmail(payload.email);
   return res;
+}
+
+async function verifyStudentEmail(email) {
+  const out = mailer.getOutbox();
+  const entry = [...out].reverse().find((e) => e.to === email);
+  expect(entry).toBeTruthy();
+  const m = entry && entry.text ? String(entry.text).match(/[a-f0-9]{64}/) : null;
+  expect(m).not.toBeNull();
+  await request(app).post("/api/auth/verify-email/confirm").send({ token: m[0] }).expect(200);
 }
 
 async function login(userType, username, password) {
@@ -119,6 +130,19 @@ beforeAll(async () => {
   const { teacherA, teacherB } = await seedBaseFixtures();
   state.teacherAId = teacherA.id;
   state.teacherBId = teacherB.id;
+  await registerUser(testStudent1);
+  await registerUser(testStudent2);
+  const s1 = await login("student", testStudent1.username, testStudent1.password);
+  state.student1.accessToken = s1.token;
+  state.student1.refreshToken = s1.refreshCookie;
+  const s2 = await login("student", testStudent2.username, testStudent2.password);
+  state.student2.accessToken = s2.token;
+  state.student2.refreshToken = s2.refreshCookie;
+  const t = await login("teacher", "alpha_teacher", "teacher123");
+  state.teacherALogin.accessToken = t.token;
+  state.teacherALogin.refreshToken = t.refreshCookie;
+  const a = await login("admin", "admin", "admin123");
+  state.adminToken = a.token;
 });
 
 afterAll(async () => {
@@ -131,13 +155,40 @@ describe("Health", () => {
     expectSuccessShape(res);
     expect(res.body.data.status).toBe("ok");
   });
+
+  it("GET /api/v1 mirrors /api for one release", async () => {
+    const legacy = await request(app).get("/api/health").expect(200);
+    const versioned = await request(app).get("/api/v1/health").expect(200);
+    expectSuccessShape(versioned);
+    expect(versioned.body.data.status).toBe(legacy.body.data.status);
+    const ready = await request(app).get("/api/v1/ready").expect(200);
+    expectSuccessShape(ready);
+    expect(ready.body.data.status).toBe("ok");
+  });
+
+  it("list endpoints share one pagination envelope with limit max 50", async () => {
+    const res = await request(app).get("/api/teachers").query({ limit: 51 });
+    expectErrorShape(res, 400, "VALIDATION_ERROR");
+    const ok = await request(app).get("/api/teachers").query({ limit: 50 }).expect(200);
+    expectSuccessShape(ok);
+    expect(ok.body.data.pagination.limit).toBe(50);
+  });
 });
 
 describe("Auth endpoints", () => {
   it("POST /api/auth/register creates a new student", async () => {
-    const res = await registerUser(testStudent1);
-    expect(res.body.data.user.username).toBe(testStudent1.username);
+    const payload = {
+      name: "Student Three",
+      username: "student_three",
+      email: "student_three@test.dev",
+      password: "student123",
+    };
+    const res = await registerUser(payload);
+    expect(res.body.data.user.username).toBe(payload.username);
     expect(res.body.data.user).not.toHaveProperty("password");
+    const row = await prisma.student.findUnique({ where: { username: payload.username }, select: { id: true } });
+    await prisma.emailVerificationToken.deleteMany({ where: { studentId: row.id } });
+    await prisma.student.deleteMany({ where: { id: row.id } });
   });
 
   it("POST /api/auth/register rejects a duplicate username", async () => {
@@ -156,7 +207,6 @@ describe("Auth endpoints", () => {
   });
 
   it("login works with a second student (for refresh/logout)", async () => {
-    await registerUser(testStudent2);
     const data = await login(
       "student",
       testStudent2.username,
@@ -348,6 +398,168 @@ describe("Subscriptions & content access", () => {
       .set("Authorization", `Bearer ${state.student1.accessToken}`)
       .send({ teacherId: state.teacherAId, duration: "NOT_A_DURATION" });
     expectErrorShape(res, 400, "VALIDATION_ERROR");
+  });
+
+  describe("payment webhook", () => {
+    const wh = { teacherId: null, gatewayTeacherId: null, studentToken: null, studentId: null, gatewayToken: null, gatewayStudentId: null };
+
+    async function verifyStudentEmail(email) {
+      const out = mailer.getOutbox();
+      const entry = [...out].reverse().find((e) => e.to === email);
+      const m = entry && entry.text ? String(entry.text).match(/[a-f0-9]{64}/) : null;
+      if (!m) return;
+      await request(app).post("/api/auth/verify-email/confirm").send({ token: m[0] }).expect(200);
+    }
+
+    it("sets up webhook fixtures", async () => {
+      const t = await request(app)
+        .post("/api/admin/teachers")
+        .set("Authorization", `Bearer ${state.adminToken}`)
+        .send({
+          name: "Webhook Teacher", username: "webhook_teacher", email: "webhook_teacher@test.dev",
+          password: "teacher123", subject: "Math", gradeClass: "G1",
+          price1Month: 60, price3Months: 162, price6Months: 300, price1Year: 540,
+        })
+        .expect(201);
+      wh.teacherId = t.body.data.teacher.id;
+      const g = await request(app)
+        .post("/api/admin/teachers")
+        .set("Authorization", `Bearer ${state.adminToken}`)
+        .send({
+          name: "Gateway Teacher", username: "gateway_teacher", email: "gateway_teacher@test.dev",
+          password: "teacher123", subject: "Math", gradeClass: "G1",
+          price1Month: 60, price3Months: 162, price6Months: 300, price1Year: 540,
+        })
+        .expect(201);
+      wh.gatewayTeacherId = g.body.data.teacher.id;
+      await registerUser({ name: "WH Student", username: "webhook_student", email: "webhook_student@test.dev", password: "student123" });
+      const s = await login("student", "webhook_student", "student123");
+      wh.studentToken = s.token;
+      wh.studentId = s.user.id;
+      await registerUser({ name: "GW Student", username: "gateway_student", email: "gateway_student@test.dev", password: "student123" });
+      const gs = await login("student", "gateway_student", "student123");
+      wh.gatewayToken = gs.token;
+      wh.gatewayStudentId = gs.user.id;
+    });
+
+    it("POST /api/subscriptions/webhook activates a subscription", async () => {
+      const res = await request(app)
+        .post("/api/subscriptions/webhook")
+        .set("Authorization", `Bearer ${wh.studentToken}`)
+        .send({ teacherId: wh.teacherId, duration: "ONE_MONTH" })
+        .expect(201);
+      expectSuccessShape(res);
+      expect(res.body.data.subscription.teacherRole).toBe(`SUB${wh.teacherId}`);
+    });
+
+    it("a duplicate webhook activation is rejected with 409", async () => {
+      const res = await request(app)
+        .post("/api/subscriptions/webhook")
+        .set("Authorization", `Bearer ${wh.studentToken}`)
+        .send({ teacherId: wh.teacherId, duration: "ONE_YEAR" });
+      expectErrorShape(res, 409, "ACTIVE_SUBSCRIPTION_EXISTS");
+    });
+
+    it("webhook rejects invalid body (400)", async () => {
+      const res = await request(app)
+        .post("/api/subscriptions/webhook")
+        .set("Authorization", `Bearer ${wh.studentToken}`)
+        .send({ teacherId: wh.teacherId, duration: "NOPE" });
+      expectErrorShape(res, 400, "VALIDATION_ERROR");
+    });
+
+    it("gateway mode returns intent without creating, webhook enforces signature", async () => {
+      const prevProvider = process.env.PAYMENT_PROVIDER;
+      const prevSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+      process.env.PAYMENT_PROVIDER = "gateway";
+      process.env.PAYMENT_WEBHOOK_SECRET = "t20secret";
+      try {
+        const intent = await request(app)
+          .post("/api/subscriptions/confirm-payment")
+          .set("Authorization", `Bearer ${wh.gatewayToken}`)
+          .send({ teacherId: wh.gatewayTeacherId, duration: "ONE_MONTH" })
+          .expect(202);
+        expectSuccessShape(intent);
+        expect(intent.body.data.intent.provider).toBe("gateway");
+        expect(Number(intent.body.data.intent.price)).toBe(60);
+        const plans = await request(app)
+          .get(`/api/subscriptions/teacher/${wh.gatewayTeacherId}`)
+          .set("Authorization", `Bearer ${wh.gatewayToken}`)
+          .expect(200);
+        expect(plans.body.data.hasActiveSubscription).toBe(false);
+        const noSig = await request(app)
+          .post("/api/subscriptions/webhook")
+          .set("Authorization", `Bearer ${wh.gatewayToken}`)
+          .send({ teacherId: wh.gatewayTeacherId, duration: "ONE_MONTH" });
+        expectErrorShape(noSig, 401, "INVALID_WEBHOOK_SIGNATURE");
+        const badSig = await request(app)
+          .post("/api/subscriptions/webhook")
+          .set("Authorization", `Bearer ${wh.gatewayToken}`)
+          .set("x-payment-signature", "wrong")
+          .send({ teacherId: wh.gatewayTeacherId, duration: "ONE_MONTH" });
+        expectErrorShape(badSig, 401, "INVALID_WEBHOOK_SIGNATURE");
+        const ok = await request(app)
+          .post("/api/subscriptions/webhook")
+          .set("Authorization", `Bearer ${wh.gatewayToken}`)
+          .set("x-payment-signature", "t20secret")
+          .send({ teacherId: wh.gatewayTeacherId, duration: "ONE_MONTH" })
+          .expect(201);
+        expectSuccessShape(ok);
+        expect(ok.body.data.subscription.teacherRole).toBe(`SUB${wh.gatewayTeacherId}`);
+      } finally {
+        if (prevProvider === undefined) delete process.env.PAYMENT_PROVIDER;
+        else process.env.PAYMENT_PROVIDER = prevProvider;
+        if (prevSecret === undefined) delete process.env.PAYMENT_WEBHOOK_SECRET;
+        else process.env.PAYMENT_WEBHOOK_SECRET = prevSecret;
+      }
+    });
+
+    it("cleans up webhook fixtures", async () => {
+      const sIds = [wh.studentId, wh.gatewayStudentId].filter(Boolean);
+      const tIds = [wh.teacherId, wh.gatewayTeacherId].filter(Boolean);
+      if (sIds.length || tIds.length) {
+        await prisma.refreshToken.deleteMany({ where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] } });
+        await prisma.subscription.deleteMany({ where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] } });
+        await prisma.teacherContent.deleteMany({ where: { teacherId: { in: tIds } } });
+      }
+      if (sIds.length) await prisma.student.deleteMany({ where: { id: { in: sIds } } });
+      if (tIds.length) await prisma.teacher.deleteMany({ where: { id: { in: tIds } } });
+    });
+  });
+
+  describe("email verification gate", () => {
+    it("register auto-sends a verification token", async () => {
+      await registerUser({ name: "Gate Student", username: "gate_student", email: "gate_student@test.dev", password: "student123" });
+      const out = mailer.getOutbox();
+      const entry = [...out].reverse().find((e) => e.to === "gate_student@test.dev");
+      expect(entry).toBeTruthy();
+      const row = await prisma.student.findUnique({ where: { username: "gate_student" }, select: { id: true } });
+      await prisma.refreshToken.deleteMany({ where: { studentId: row.id } });
+      await prisma.subscription.deleteMany({ where: { studentId: row.id } });
+      await prisma.emailVerificationToken.deleteMany({ where: { studentId: row.id } });
+      await prisma.student.deleteMany({ where: { id: row.id } });
+    });
+
+    it("unverified students cannot subscribe", async () => {
+      await request(app).post("/api/auth/register").send({
+        name: "Raw Student", username: "raw_student", email: "raw_student@test.dev", password: "student123",
+      });
+      const data = await login("student", "raw_student", "student123");
+      const denied = await request(app)
+        .post("/api/subscriptions/confirm-payment")
+        .set("Authorization", `Bearer ${data.token}`)
+        .send({ teacherId: state.teacherBId, duration: "ONE_MONTH" });
+      expectErrorShape(denied, 403, "EMAIL_NOT_VERIFIED");
+      const hook = await request(app)
+        .post("/api/subscriptions/webhook")
+        .set("Authorization", `Bearer ${data.token}`)
+        .send({ teacherId: state.teacherBId, duration: "ONE_MONTH" });
+      expectErrorShape(hook, 403, "EMAIL_NOT_VERIFIED");
+      const row = await prisma.student.findUnique({ where: { username: "raw_student" }, select: { id: true } });
+      await prisma.refreshToken.deleteMany({ where: { studentId: row.id } });
+      await prisma.emailVerificationToken.deleteMany({ where: { studentId: row.id } });
+      await prisma.student.deleteMany({ where: { id: row.id } });
+    });
   });
 
   it("content page is accessible with an active subscription", async () => {
@@ -1429,5 +1641,27 @@ describe("Swagger UI", () => {
     const res = await request(app).get("/api-docs/").expect(200);
     expect(res.headers["content-type"]).toMatch(/html/);
     expect(res.text).toContain("Education System API Documentation");
+  });
+});
+
+describe("Validation-limit fixture cleanup", () => {
+  it("removes the long-email fixtures", async () => {
+    const student = await prisma.student.findUnique({ where: { username: "long_email_student" }, select: { id: true } });
+    if (student) {
+      await prisma.refreshToken.deleteMany({ where: { studentId: student.id } });
+      await prisma.passwordResetToken.deleteMany({ where: { studentId: student.id } });
+      await prisma.emailVerificationToken.deleteMany({ where: { studentId: student.id } });
+      await prisma.subscription.deleteMany({ where: { studentId: student.id } });
+      await prisma.student.deleteMany({ where: { id: student.id } });
+    }
+    const teacher = await prisma.teacher.findUnique({ where: { username: "long_email_teacher" }, select: { id: true } });
+    if (teacher) {
+      await prisma.refreshToken.deleteMany({ where: { teacherId: teacher.id } });
+      await prisma.passwordResetToken.deleteMany({ where: { teacherId: teacher.id } });
+      await prisma.emailVerificationToken.deleteMany({ where: { teacherId: teacher.id } });
+      await prisma.subscription.deleteMany({ where: { teacherId: teacher.id } });
+      await prisma.teacherContent.deleteMany({ where: { teacherId: teacher.id } });
+      await prisma.teacher.deleteMany({ where: { id: teacher.id } });
+    }
   });
 });

@@ -1,5 +1,6 @@
 const { Router } = require("express");
-const { success } = require("../utils/apiResponse");
+const { success, error } = require("../utils/apiResponse");
+const prisma = require("../db/prisma");
 const authRoutes = require("./auth.routes");
 const teacherRoutes = require("./teacher.routes");
 const contactRoutes = require("./contact.routes");
@@ -14,6 +15,15 @@ const router = Router();
 
 router.get("/health", (req, res) => {
   return success(res, { status: "ok", timestamp: new Date().toISOString() });
+});
+
+router.get("/ready", async (req, res) => {
+  try {
+    await prisma.$queryRawUnsafe("SELECT 1");
+    return success(res, { status: "ok", timestamp: new Date().toISOString() });
+  } catch (err) {
+    return error(res, "Database not ready", 503, "NOT_READY", err.message);
+  }
 });
 
 router.use("/auth", authRoutes);

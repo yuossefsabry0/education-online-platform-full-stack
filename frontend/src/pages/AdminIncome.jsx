@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { endpoints, toApiError } from "../api/client.js";
 import { ErrorBox, Loader } from "../components/ui.jsx";
+import { formatPrice } from "../utils/format.js";
 
 // GET /api/admin/income -> { totalIncome, totalPayments }
 export default function AdminIncome() {
@@ -36,22 +37,19 @@ export default function AdminIncome() {
     );
   }
 
-  const incomeText = (() => {
-    if (!data) return "0.00";
-    const n = Number(data.totalIncome);
-    if (!Number.isFinite(n)) return "0.00";
-    return n.toFixed(2);
-  })();
+  const incomeText = formatPrice(data ? data.totalIncome : 0);
 
   return (
     <div className="page">
       <h1>Platform income</h1>
       <div className="table-wrap">
         <table className="data-table">
-          <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+          <caption className="muted small">Platform income</caption>
+          <thead><tr><th scope="col">Metric</th><th scope="col">Value</th></tr></thead>
           <tbody>
-            <tr><td>Total income (sum of subscription prices)</td><td>{incomeText}</td></tr>
+            <tr><td>Total income (paid subscriptions, cancelled excluded)</td><td>{incomeText}</td></tr>
             <tr><td>Total payments (subscription records)</td><td>{data.totalPayments}</td></tr>
+            <tr><td>Cancelled payments (excluded from income)</td><td>{data.cancelledPayments ?? 0}</td></tr>
           </tbody>
         </table>
       </div>

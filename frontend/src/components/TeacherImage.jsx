@@ -6,7 +6,7 @@ export function teacherImageUrl(teacher) {
 }
 
 export default function TeacherImage({ teacher, alt }) {
-  const label = alt || (teacher && teacher.name ? `Illustrative image for ${teacher.name}` : "Teacher");
+  const label = alt || (teacher && teacher.name ? `Placeholder illustrative image for ${teacher.name}` : "Placeholder teacher image");
   return (
     <SafeImg
       className="zoom-img"

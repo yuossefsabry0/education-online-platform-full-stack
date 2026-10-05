@@ -40,7 +40,7 @@ const idParam = intParam(1, 1_000_000_000);
 
 const pagination = {
   page: intParam(1, 1_000_000).default(1),
-  limit: intParam(1, 100).default(10),
+  limit: intParam(1, 50).default(10),
 };
 
 const subscriberSorting = {

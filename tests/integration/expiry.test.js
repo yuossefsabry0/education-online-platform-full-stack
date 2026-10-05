@@ -9,7 +9,8 @@ let teacherId;
 let studentId;
 
 async function pastActiveSubscription(student, teacher) {
-  const past = new Date(Date.now() - 86400000);
+  const startDate = new Date(Date.now() - 86400000);
+  const endDate = new Date(startDate.getTime() + 1000);
   return prisma.subscription.create({
     data: {
       studentId: student,
@@ -17,8 +18,8 @@ async function pastActiveSubscription(student, teacher) {
       teacherRole: `SUB${teacher}`,
       duration: "ONE_MONTH",
       price: 60,
-      startDate: past,
-      endDate: past,
+      startDate,
+      endDate,
       status: "ACTIVE",
     },
   });
@@ -69,6 +70,8 @@ afterAll(async () => {
     await prisma.logHistory.deleteMany({ where: { targetId: { in: ids } } });
   }
   await prisma.refreshToken.deleteMany({ where: { OR: [{ studentId }, { teacherId }] } });
+  await prisma.passwordResetToken.deleteMany({ where: { OR: [{ studentId }, { teacherId }] } });
+  await prisma.emailVerificationToken.deleteMany({ where: { OR: [{ studentId }, { teacherId }] } });
   await prisma.subscription.deleteMany({ where: { OR: [{ studentId }, { teacherId }] } });
   await prisma.student.deleteMany({ where: { id: studentId } });
   await prisma.teacher.deleteMany({ where: { id: teacherId } });
@@ -107,7 +110,8 @@ describe("subscription expiry job", () => {
   });
 
   it("leaves already-expired records untouched", async () => {
-    const past = new Date(Date.now() - 86400000);
+    const startDate = new Date(Date.now() - 86400000);
+    const endDate = new Date(startDate.getTime() + 1000);
     const sub = await prisma.subscription.create({
       data: {
         studentId,
@@ -115,8 +119,8 @@ describe("subscription expiry job", () => {
         teacherRole: `SUB${teacherId}`,
         duration: "ONE_MONTH",
         price: 60,
-        startDate: past,
-        endDate: past,
+        startDate,
+        endDate,
         status: "EXPIRED",
       },
     });

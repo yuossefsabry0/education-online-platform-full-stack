@@ -7,7 +7,7 @@ const fileUrlField = z
   .string()
   .max(500, "fileUrl must be at most 500 characters")
   .refine((v) => isAcceptedFileUrl(v), {
-    message: "fileUrl must be a valid http(s) URL or uploaded file path",
+    message: "fileUrl must be an uploaded file path or an allowlisted URL",
   })
   .optional();
 
@@ -15,7 +15,7 @@ const nullableFileUrlField = z
   .string()
   .max(500, "fileUrl must be at most 500 characters")
   .refine((v) => isAcceptedFileUrl(v), {
-    message: "fileUrl must be a valid http(s) URL or uploaded file path",
+    message: "fileUrl must be an uploaded file path or an allowlisted URL",
   })
   .optional()
   .nullable();

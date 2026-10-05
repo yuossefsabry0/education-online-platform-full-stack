@@ -13,6 +13,7 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const notice = location.state && location.state.notice ? location.state.notice : null;
   const [form, setForm] = useState({ username: "", password: "" });
   // Shown only when the backend reports the username exists in more than one
   // account table (409 AMBIGUOUS_USERNAME); otherwise login needs no type.
@@ -49,6 +50,11 @@ export default function Login() {
       <div className="form-card">
         <h1>Login</h1>
         <p className="muted">Sign in with your education system account.</p>
+        {notice ? (
+          <div className="alert alert-success" role="status">
+            {notice}
+          </div>
+        ) : null}
         {error ? (
           <div className="alert alert-error" role="alert">
             {error.message}

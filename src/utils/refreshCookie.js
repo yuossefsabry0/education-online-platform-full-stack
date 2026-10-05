@@ -5,6 +5,18 @@ function isSecureEnv() {
 }
 
 function refreshCookieMaxAge() {
+  const raw = String(process.env.REFRESH_TOKEN_EXPIRES_IN || "7d").trim();
+  const m = raw.match(/^(\d+)\s*([smhd])$/i);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    const unit = m[2].toLowerCase();
+    if (unit === "s") return n;
+    if (unit === "m") return n * 60;
+    if (unit === "h") return n * 60 * 60;
+    return n * 24 * 60 * 60;
+  }
+  const asNumber = parseInt(raw, 10);
+  if (Number.isFinite(asNumber) && asNumber > 0) return asNumber;
   return 7 * 24 * 60 * 60;
 }
 

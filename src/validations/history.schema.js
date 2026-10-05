@@ -16,6 +16,8 @@ const intParam = (min, max) =>
 const historyQuerySchema = z.object({
   page: intParam(1, 1_000_000).default(1),
   limit: intParam(1, 50).default(10),
+  subPage: intParam(1, 1_000_000).optional(),
+  eventPage: intParam(1, 1_000_000).optional(),
 });
 
 module.exports = { historyQuerySchema };

@@ -5,7 +5,7 @@ export function initialOf(label) {
   return text ? text.charAt(0).toUpperCase() : "E";
 }
 
-export default function SafeImg({ src, alt, className, label, eager }) {
+export default function SafeImg({ src, alt, className, label, eager, width, height }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -19,6 +19,8 @@ export default function SafeImg({ src, alt, className, label, eager }) {
       className={className}
       src={src}
       alt={alt}
+      width={width || 640}
+      height={height || 420}
       loading={eager ? "eager" : "lazy"}
       onError={() => setFailed(true)}
     />

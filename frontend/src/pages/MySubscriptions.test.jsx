@@ -45,7 +45,7 @@ beforeEach(() => {
 });
 
 describe("MySubscriptions", () => {
-  it("lists subscriptions with teacher details", async () => {
+  it("lists subscriptions with teacher details and a cancel-only action", async () => {
     mockMine.mockResolvedValueOnce({
       subscriptions: [
         { id: 3, endDate: new Date().toISOString(), teacher: { id: 9, name: "T Nine", subject: "Math", gradeClass: "G1" } },
@@ -55,10 +55,12 @@ describe("MySubscriptions", () => {
     await waitFor(() => {
       expect(screen.getByText("T Nine")).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole("button", { name: /view content/i }));
+    expect(screen.queryByRole("button", { name: /view content/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/content/teacher/9");
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: /confirm cancellation/i })).toBeInTheDocument();
   });
 
   it("shows the empty state with a browse action", async () => {

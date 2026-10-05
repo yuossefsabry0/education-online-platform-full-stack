@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { endpoints, toApiError } from "../api/client.js";
 import { ErrorBox, Loader } from "../components/ui.jsx";
+import { formatPrice } from "../utils/format.js";
 
 // /admin/dashboard — navigation hub + live summary, all from real endpoints:
 // GET /api/admin/income, GET /api/admin/subscribers?limit=1 (total), GET /api/admin/logs?limit=1 (total).
@@ -58,7 +59,7 @@ export default function AdminDashboard() {
         <ErrorBox error={error} onRetry={() => window.location.reload()} />
       ) : summary ? (
         <div className="stat-row">
-          <div className="stat"><span>Total income</span><strong>{String(summary.totalIncome ?? 0)}</strong></div>
+          <div className="stat"><span>Total income</span><strong>{formatPrice(summary.totalIncome ?? 0)}</strong></div>
           <div className="stat"><span>Total payments</span><strong>{summary.totalPayments}</strong></div>
           <div className="stat"><span>Subscriptions</span><strong>{summary.totalSubscribers}</strong></div>
           <div className="stat"><span>Log entries</span><strong>{summary.totalLogs}</strong></div>

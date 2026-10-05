@@ -43,4 +43,20 @@ const subscriptionIdParam = z.preprocess(
     .positive("subscriptionId must be a positive integer")
 );
 
-module.exports = { teacherIdParam, subscriptionIdParam, confirmPaymentSchema, DURATIONS };
+const webhookSchema = z.object({
+  teacherId: z
+    .number({ error: "teacherId is required" })
+    .int("teacherId must be an integer")
+    .positive("teacherId must be a positive integer"),
+  duration: z
+    .enum(DURATIONS, {
+      error: `duration must be one of: ${DURATIONS.join(", ")}`,
+    }),
+  studentId: z
+    .number({ error: "studentId must be a valid number" })
+    .int("studentId must be an integer")
+    .positive("studentId must be a positive integer")
+    .optional(),
+});
+
+module.exports = { teacherIdParam, subscriptionIdParam, confirmPaymentSchema, webhookSchema, DURATIONS };

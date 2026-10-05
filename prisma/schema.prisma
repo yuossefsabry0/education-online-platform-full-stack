@@ -56,6 +56,7 @@ model Student {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   subscriptions Subscription[]
+  examAttempts  ExamAttempt[]
   refreshTokens RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -86,9 +87,12 @@ model Teacher {
   updatedAt    DateTime           @updatedAt
   subscriptions Subscription[]
   contents     TeacherContent[]
+  exams        Exam[]
   refreshTokens RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+
+  @@index([isActive])
 }
 
 // Admin — its own separate table (seeded directly, no public route)
@@ -140,13 +144,15 @@ model Subscription {
   // never reads or writes this field.
   activeSubscriptionKey Unsupported("int")?
 
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Restrict)
 
   @@unique([studentId, activeSubscriptionKey])
   @@index([studentId])
   @@index([teacherId])
   @@index([status])
+  @@index([status, endDate])
+  @@index([status, expiryNotifiedAt])
 }
 
 
@@ -166,8 +172,11 @@ model TeacherContent {
 
   teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
+  lessonExams Exam[] @relation("ExamLesson")
+
   @@index([teacherId])
   @@index([type])
+  @@index([teacherId, type, isPublished, createdAt])
 }
 
 
@@ -194,6 +203,7 @@ model RefreshToken {
   @@index([ownerType, teacherId])
   @@index([ownerType, adminId])
   @@index([familyId])
+  @@index([expiresAt])
 }
 
 
@@ -215,6 +225,7 @@ model PasswordResetToken {
   @@index([ownerType, studentId])
   @@index([ownerType, teacherId])
   @@index([ownerType, adminId])
+  @@index([expiresAt])
 }
 
 
@@ -236,6 +247,7 @@ model EmailVerificationToken {
   @@index([ownerType, studentId])
   @@index([ownerType, teacherId])
   @@index([ownerType, adminId])
+  @@index([expiresAt])
 }
 
 
@@ -259,4 +271,70 @@ model LogHistory {
   @@index([actorType])
   @@index([targetId])
   @@index([timestamp])
+  @@index([actionType, actorType, timestamp])
+}
+
+
+// Exams — created by teachers inside the assignment (homework) workflow.
+// Each exam holds multiple-choice questions with a designated correct answer
+// and a teacher-defined time limit. An exam may link to one of the teacher's
+// own lecture lessons so students can jump back with "Go to Lesson".
+
+model Exam {
+  id               Int            @id @default(autoincrement())
+  teacherId        Int
+  lessonContentId  Int?
+  title            String         @db.VarChar(255)
+  timeLimitSeconds Int            @default(600)
+  isPublished      Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  teacher   Teacher         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  lesson    TeacherContent? @relation("ExamLesson", fields: [lessonContentId], references: [id], onDelete: SetNull)
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+
+  @@index([teacherId])
+  @@index([teacherId, isPublished, createdAt])
+}
+
+
+model ExamQuestion {
+  id           Int    @id @default(autoincrement())
+  examId       Int
+  text         String @db.VarChar(1000)
+  // Multiple-choice options, stored in display order: ["A", "B", "C", "D"]
+  options      Json
+  // Index into options[] designating the correct answer (set by the teacher)
+  correctIndex Int
+  position     Int    @default(0)
+
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+}
+
+
+// One graded exam sitting per row: unanswered questions count as incorrect,
+// so correct/total/percent fully describe the result.
+
+model ExamAttempt {
+  id          Int      @id @default(autoincrement())
+  examId      Int
+  studentId   Int
+  // Chosen option index per question (null = unanswered = incorrect)
+  answers     Json
+  correct     Int      @default(0)
+  total       Int      @default(0)
+  percent     Decimal  @db.Decimal(5, 2) @default(0)
+  timedOut    Boolean  @default(false)
+  submittedAt DateTime @default(now())
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([studentId])
+  @@index([examId, studentId])
 }

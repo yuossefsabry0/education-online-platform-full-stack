@@ -26,6 +26,15 @@ async function loginAs(userType, username, password) {
   return res.body.data.token;
 }
 
+async function verifyStudentEmail(email) {
+  const out = mailer.getOutbox();
+  const entry = [...out].reverse().find((e) => e.to === email);
+  expect(entry).toBeTruthy();
+  const m = entry && entry.text ? String(entry.text).match(/[a-f0-9]{64}/) : null;
+  expect(m).not.toBeNull();
+  await request(app).post("/api/auth/verify-email/confirm").send({ token: m[0] }).expect(200);
+}
+
 const S = {};
 
 beforeAll(async () => {
@@ -59,6 +68,7 @@ beforeAll(async () => {
     email: "t3bstudent@test.dev",
     password: "student123",
   });
+  await verifyStudentEmail("t3bstudent@test.dev");
   S.studentToken = await loginAs("student", "t3b_student", "student123");
   const row = await prisma.student.findUnique({ where: { username: "t3b_student" }, select: { id: true } });
   S.studentId = row.id;
@@ -86,6 +96,8 @@ afterAll(async () => {
   const subIds = subs.map((s) => String(s.id));
   if (subIds.length) await prisma.logHistory.deleteMany({ where: { targetId: { in: subIds } } });
   await prisma.refreshToken.deleteMany({ where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] } });
+  await prisma.passwordResetToken.deleteMany({ where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] } });
+  await prisma.emailVerificationToken.deleteMany({ where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] } });
   await prisma.subscription.deleteMany({ where: { OR: [{ studentId: S.studentId }, { teacherId: S.teacherId }] } });
   const files = await prisma.teacherContent.findMany({
     where: { teacherId: S.teacherId },
@@ -182,21 +194,37 @@ describe("content pagination and search", () => {
     expectErrorShape(admin, 403, "FORBIDDEN");
   });
 
-  it("paginates the teacher dashboard list", async () => {
+  it("paginates the teacher dashboard list per section", async () => {
     const res = await request(app)
       .get("/api/teacher/dashboard")
       .query({ page: 1, limit: 5 })
       .set("Authorization", `Bearer ${S.teacherToken}`)
       .expect(200);
-    expect(res.body.data.pagination).toMatchObject({ page: 1, limit: 5, total: 12, totalPages: 3 });
-    const flat = (res.body.data.sections || []).flatMap((s) => s.content || []);
-    expect(flat).toHaveLength(5);
+    const lectures = (res.body.data.sections || []).find((s) => s.key === "lectures");
+    expect(lectures.pagination).toMatchObject({ page: 1, limit: 5, total: 12, totalPages: 3 });
+    expect(lectures.content).toHaveLength(5);
     const searched = await request(app)
       .get("/api/teacher/dashboard")
       .query({ q: "LECTURE 12" })
       .set("Authorization", `Bearer ${S.teacherToken}`)
       .expect(200);
-    expect(searched.body.data.pagination.total).toBe(1);
+    const searchedLectures = (searched.body.data.sections || []).find((s) => s.key === "lectures");
+    expect(searchedLectures.pagination.total).toBe(1);
+  });
+
+  it("filters teacher subscribers by status with pagination", async () => {
+    const expired = await request(app)
+      .get("/api/teacher/dashboard/subscribers")
+      .query({ status: "EXPIRED" })
+      .set("Authorization", `Bearer ${S.teacherToken}`)
+      .expect(200);
+    expectSuccessShape(expired);
+    expect(expired.body.data.pagination).toMatchObject({ page: 1 });
+    const bad = await request(app)
+      .get("/api/teacher/dashboard/subscribers")
+      .query({ status: "NOPE" })
+      .set("Authorization", `Bearer ${S.teacherToken}`);
+    expectErrorShape(bad, 400, "VALIDATION_ERROR");
   });
 });
 
@@ -287,6 +315,14 @@ describe("file upload and retrieval", () => {
     expectErrorShape(res, 404, "NOT_FOUND");
   });
 
+  it("rejects non-allowlisted external file urls on content", async () => {
+    const res = await request(app)
+      .post("/api/teacher/dashboard/content")
+      .set("Authorization", `Bearer ${S.teacherToken}`)
+      .send({ type: "LECTURE", title: "T3B evil ref", fileUrl: "https://evil.example.com/x.mp4" });
+    expectErrorShape(res, 400, "VALIDATION_ERROR");
+  });
+
   it("denies unsubscribed students the bytes", async () => {
     const up = await request(app)
       .post("/api/teacher/dashboard/content/upload")
@@ -310,6 +346,36 @@ describe("file upload and retrieval", () => {
     const sRow = await prisma.student.findUnique({ where: { username: "t3b_stranger" }, select: { id: true } });
     await prisma.refreshToken.deleteMany({ where: { studentId: sRow.id } });
     await prisma.student.deleteMany({ where: { id: sRow.id } });
+  });
+
+  it("authorizes downloads per content row when contentId is given", async () => {
+    const up = await request(app)
+      .post("/api/teacher/dashboard/content/upload")
+      .set("Authorization", `Bearer ${S.teacherToken}`)
+      .attach("file", png, "rowcheck.png")
+      .expect(201);
+    const row = await prisma.teacherContent.create({
+      data: { teacherId: S.teacherId, type: "LECTURE", title: "rowcheck", fileUrl: up.body.data.fileUrl, isPublished: true },
+      select: { id: true },
+    });
+    const ok = await request(app)
+      .get(up.body.data.fileUrl)
+      .query({ contentId: row.id })
+      .set("Authorization", `Bearer ${S.studentToken}`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    expect(ok.headers["content-type"]).toContain("image/png");
+    const wrong = await request(app)
+      .get(up.body.data.fileUrl)
+      .query({ contentId: 999999999 })
+      .set("Authorization", `Bearer ${S.studentToken}`);
+    expectErrorShape(wrong, 403, "FORBIDDEN");
+    await prisma.teacherContent.deleteMany({ where: { id: row.id } });
   });
 });
 
@@ -343,6 +409,32 @@ describe("student history view", () => {
       .set("Authorization", `Bearer ${S.adminToken}`);
     expectErrorShape(admin, 403, "FORBIDDEN");
   });
+
+  it("includes system notifications and honors split pagination", async () => {
+    await prisma.logHistory.create({
+      data: {
+        actionType: "SUBSCRIPTION_EXPIRY_NOTIFIED",
+        actorId: String(S.studentId),
+        actorType: "SYSTEM",
+        targetId: "t3b-system-probe",
+        details: { status: "sent" },
+      },
+    });
+    try {
+      const res = await request(app)
+        .get("/api/user/history")
+        .query({ subPage: 1, eventPage: 1 })
+        .set("Authorization", `Bearer ${S.studentToken}`)
+        .expect(200);
+      expectSuccessShape(res);
+      expect(res.body.data.subscriptions.pagination).toMatchObject({ page: 1 });
+      expect(res.body.data.events.pagination).toMatchObject({ page: 1 });
+      const types = res.body.data.events.items.map((e) => e.actionType);
+      expect(types).toContain("SUBSCRIPTION_EXPIRY_NOTIFIED");
+    } finally {
+      await prisma.logHistory.deleteMany({ where: { targetId: "t3b-system-probe" } });
+    }
+  });
 });
 
 describe("subscription notifications", () => {
@@ -370,7 +462,7 @@ describe("subscription notifications", () => {
 
   it("notifies exactly once on expiry", async () => {
     const studentId = await makeStudent("t3b_exp1");
-    const past = new Date(Date.now() - 86400000);
+    const startDate = new Date(Date.now() - 86400000);
     const sub = await prisma.subscription.create({
       data: {
         studentId,
@@ -378,8 +470,8 @@ describe("subscription notifications", () => {
         teacherRole: `SUB${S.teacherId}`,
         duration: "ONE_MONTH",
         price: 60,
-        startDate: past,
-        endDate: past,
+        startDate,
+        endDate: new Date(startDate.getTime() + 1000),
         status: "ACTIVE",
       },
     });
@@ -405,6 +497,7 @@ describe("subscription notifications", () => {
       email: "t3bselfcancel@test.dev",
       password: "student123",
     });
+    await verifyStudentEmail("t3bselfcancel@test.dev");
     const selfToken = await loginAs("student", "t3b_selfcancel", "student123");
     const selfCreated = await request(app)
       .post("/api/subscriptions/confirm-payment")
@@ -431,6 +524,7 @@ describe("subscription notifications", () => {
       email: "t3bcancelled@test.dev",
       password: "student123",
     });
+    await verifyStudentEmail("t3bcancelled@test.dev");
     const token = await loginAs("student", "t3b_cancelled", "student123");
     const created = await request(app)
       .post("/api/subscriptions/confirm-payment")
@@ -454,9 +548,9 @@ describe("subscription notifications", () => {
   });
 
   it("records notification failures without crashing the job", async () => {
-    const spy = jest.spyOn(mailer, "sendMail").mockRejectedValueOnce(new Error("smtp down"));
     const studentId = await makeStudent("t3b_exp2");
-    const past = new Date(Date.now() - 86400000);
+    const spy = jest.spyOn(mailer, "sendMail").mockRejectedValueOnce(new Error("smtp down"));
+    const startDate = new Date(Date.now() - 86400000);
     const sub = await prisma.subscription.create({
       data: {
         studentId,
@@ -464,8 +558,8 @@ describe("subscription notifications", () => {
         teacherRole: `SUB${S.teacherId}`,
         duration: "ONE_MONTH",
         price: 60,
-        startDate: past,
-        endDate: past,
+        startDate,
+        endDate: new Date(startDate.getTime() + 1000),
         status: "ACTIVE",
       },
     });

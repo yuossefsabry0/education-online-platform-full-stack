@@ -57,7 +57,7 @@ export function notifySessionExpired() {
   }
 }
 
-const api = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
+const api = axios.create({ baseURL: API_BASE_URL, withCredentials: true, timeout: 15000 });
 
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
@@ -70,7 +70,9 @@ api.interceptors.request.use((config) => {
 
 let refreshPromise = null;
 
-async function refreshAccessTokenOnce() {
+// Single-flight access-token refresh shared by the interceptor and the auth
+// revalidation below, so concurrent callers reuse one rotation request.
+export async function refreshAccessTokenOnce() {
   if (!refreshPromise) {
     refreshPromise = axios
       .post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
@@ -110,7 +112,10 @@ api.interceptors.response.use(
       } catch (refreshErr) {
         clearSession();
         notifySessionExpired();
-        return Promise.reject(refreshErr);
+        try {
+          Object.defineProperty(err, "refreshError", { value: refreshErr, configurable: true });
+        } catch {}
+        return Promise.reject(err);
       }
     }
     return Promise.reject(err);
@@ -158,35 +163,36 @@ function paramsSerializer(params) {
   return search.toString();
 }
 
-async function get(path, params) {
-  const res = await api.get(path, { params, paramsSerializer: { serialize: paramsSerializer } });
+async function get(path, params, options) {
+  const res = await api.get(path, { params, paramsSerializer: { serialize: paramsSerializer }, signal: options ? options.signal : undefined });
   return unwrap(res);
 }
 
-async function post(path, body) {
-  const res = await api.post(path, body);
+async function post(path, body, options) {
+  const res = await api.post(path, body, { signal: options ? options.signal : undefined });
   return unwrap(res);
 }
 
-async function put(path, body) {
-  const res = await api.put(path, body);
+async function put(path, body, options) {
+  const res = await api.put(path, body, { signal: options ? options.signal : undefined });
   return unwrap(res);
 }
 
-async function del(path) {
-  const res = await api.delete(path);
+async function del(path, options) {
+  const res = await api.delete(path, { signal: options ? options.signal : undefined });
   return unwrap(res);
 }
 
-async function uploadFile(path, file) {
+async function uploadFile(path, file, options) {
   const form = new FormData();
   form.append("file", file);
-  const res = await api.post(path, form);
+  const res = await api.post(path, form, { signal: options ? options.signal : undefined });
   return unwrap(res);
 }
 
-export async function downloadStoredFile(fileUrl) {
-  const res = await api.get(fileUrl, { responseType: "blob" });
+export async function downloadStoredFile(fileUrl, options) {
+  const target = typeof fileUrl === "string" ? fileUrl.replace(/^\/api(?=\/)/, "") : fileUrl;
+  const res = await api.get(target, { responseType: "blob", signal: options ? options.signal : undefined, params: options ? options.params : undefined });
   return res.data;
 }
 
@@ -213,13 +219,13 @@ export const endpoints = {
 
   listTeachers: (params) => get("/teachers", params),
   searchTeachers: (params) => get("/teachers/search", params),
-  teacherContentIndex: (teacherId) => get(`/teachers/${teacherId}/content`),
 
   me: () => get("/user/me"),
   history: (params) => get("/user/history", params),
 
   subscriptionPlans: (teacherId) => get(`/subscriptions/teacher/${teacherId}`),
   confirmPayment: (body) => post("/subscriptions/confirm-payment", body),
+  subscriptionWebhook: (body) => post("/subscriptions/webhook", body),
   cancelSubscription: (subscriptionId) => post(`/subscriptions/${subscriptionId}/cancel`, {}),
   mySubscriptions: () => get("/subscriptions/mine"),
 
@@ -227,12 +233,26 @@ export const endpoints = {
   contentSection: (teacherId, section, params) => get(`/content/teacher/${teacherId}/${section}`, params),
 
   teacherDashboard: (params) => get("/teacher/dashboard", params),
-  teacherSubscribers: () => get("/teacher/dashboard/subscribers"),
+  teacherSubscribers: (params) => get("/teacher/dashboard/subscribers", params),
   teacherIncome: () => get("/teacher/dashboard/income"),
   teacherAddContent: (body) => post("/teacher/dashboard/content", body),
   teacherEditContent: (contentId, body) => put(`/teacher/dashboard/content/${contentId}`, body),
   teacherDeleteContent: (contentId) => del(`/teacher/dashboard/content/${contentId}`),
   teacherUploadContent: (file) => uploadFile("/teacher/dashboard/content/upload", file),
+
+  teacherExams: () => get("/teacher/dashboard/exams"),
+  teacherExamDetail: (examId) => get(`/teacher/dashboard/exams/${examId}`),
+  teacherAddExam: (body) => post("/teacher/dashboard/exams", body),
+  teacherEditExam: (examId, body) => put(`/teacher/dashboard/exams/${examId}`, body),
+  teacherDeleteExam: (examId) => del(`/teacher/dashboard/exams/${examId}`),
+  teacherExamGrades: (examId) => get(`/teacher/dashboard/exams/${examId}/grades`),
+
+  studentExams: (teacherId) => get(`/content/teacher/${teacherId}/exams`),
+  studentExam: (teacherId, examId) => get(`/content/teacher/${teacherId}/exams/${examId}`),
+  studentSubmitExam: (teacherId, examId, body) => post(`/content/teacher/${teacherId}/exams/${examId}/submit`, body),
+  lectureJourney: (teacherId, lectureId) => get(`/content/teacher/${teacherId}/lectures/${lectureId}/journey`),
+  recordLectureWatch: (teacherId, lectureId, body) => post(`/content/teacher/${teacherId}/lectures/${lectureId}/watch`, body || {}),
+  examPerformance: () => get("/user/exams/performance"),
 
   adminSubscribers: (params) => get("/admin/subscribers", params),
   adminTeacherSubscribers: (teacherId, params) => get(`/admin/teachers/${teacherId}/subscribers`, params),

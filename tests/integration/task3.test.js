@@ -30,6 +30,12 @@ async function registerStudent(username) {
     password: "student123",
   });
   expect(res.status).toBe(201);
+  const out = mailer.getOutbox();
+  const entry = [...out].reverse().find((e) => e.to === `${username}@test.dev`);
+  expect(entry).toBeTruthy();
+  const m = entry && entry.text ? String(entry.text).match(/[a-f0-9]{64}/) : null;
+  expect(m).not.toBeNull();
+  await request(app).post("/api/auth/verify-email/confirm").send({ token: m[0] }).expect(200);
 }
 
 async function loginAs(userType, username, password) {
@@ -110,9 +116,12 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-function lastTokenFromOutbox() {
+function lastTokenFromOutbox(subjectIncludes) {
   const box = mailer.getOutbox();
-  const text = box[box.length - 1].text;
+  const list = subjectIncludes
+    ? box.filter((e) => String(e.subject).toLowerCase().includes(subjectIncludes))
+    : box;
+  const text = list[list.length - 1].text;
   return text.match(/: ([a-f0-9]{64})/)[1];
 }
 
@@ -171,7 +180,7 @@ describe("password recovery", () => {
       .send({ userType: "student", email: "t3_pw_student@test.dev" });
     expect(reqRes.status).toBe(200);
     expect(mailer.getOutbox().length).toBe(before + 1);
-    const raw = lastTokenFromOutbox();
+    const raw = lastTokenFromOutbox("reset");
     const target = await loginAs("student", "t3_pw_student", "newpass123");
     const confirm = await request(app)
       .post("/api/auth/password-reset/confirm")
@@ -203,7 +212,7 @@ describe("password recovery", () => {
     await request(app)
       .post("/api/auth/password-reset/request")
       .send({ userType: "student", email: "t3_pw_student@test.dev" });
-    const raw = lastTokenFromOutbox();
+    const raw = lastTokenFromOutbox("reset");
     await prisma.passwordResetToken.update({
       where: { tokenHash: hashToken(raw) },
       data: { expiresAt: new Date(Date.now() - 1000) },
@@ -218,7 +227,7 @@ describe("password recovery", () => {
     await request(app)
       .post("/api/auth/password-reset/request")
       .send({ userType: "student", email: "t3_pw_student@test.dev" });
-    const raw = lastTokenFromOutbox();
+    const raw = lastTokenFromOutbox("reset");
     await request(app)
       .post("/api/auth/password-reset/confirm")
       .send({ token: raw, newPassword: "reused123" })
@@ -304,7 +313,13 @@ describe("student self-unsubscribe", () => {
 
 describe("email verification", () => {
   it("leaves existing logins working for unverified accounts", async () => {
-    await registerStudent("t3_verify_student");
+    const res = await request(app).post("/api/auth/register").send({
+      name: "t3_verify_student Name",
+      username: "t3_verify_student",
+      email: "t3_verify_student@test.dev",
+      password: "student123",
+    });
+    expect(res.status).toBe(201);
     const row = await prisma.student.findUnique({
       where: { username: "t3_verify_student" },
       select: { emailVerified: true },
@@ -318,7 +333,7 @@ describe("email verification", () => {
       .post("/api/auth/verify-email/resend")
       .send({ userType: "student", email: "t3_verify_student@test.dev" })
       .expect(200);
-    const raw = lastTokenFromOutbox();
+    const raw = lastTokenFromOutbox("verify");
     const res = await request(app)
       .post("/api/auth/verify-email/confirm")
       .send({ token: raw })
@@ -340,7 +355,7 @@ describe("email verification", () => {
       .post("/api/auth/verify-email/resend")
       .send({ userType: "student", email: "t3_verify_student@test.dev" })
       .expect(200);
-    const raw = lastTokenFromOutbox();
+    const raw = lastTokenFromOutbox("verify");
     await prisma.emailVerificationToken.update({
       where: { tokenHash: hashToken(raw) },
       data: { expiresAt: new Date(Date.now() - 1000) },
@@ -353,7 +368,7 @@ describe("email verification", () => {
       .post("/api/auth/verify-email/resend")
       .send({ userType: "student", email: "t3_verify_student@test.dev" })
       .expect(200);
-    const fresh = lastTokenFromOutbox();
+    const fresh = lastTokenFromOutbox("verify");
     await request(app).post("/api/auth/verify-email/confirm").send({ token: fresh }).expect(200);
     const reuse = await request(app)
       .post("/api/auth/verify-email/confirm")
@@ -366,12 +381,12 @@ describe("email verification", () => {
       .post("/api/auth/verify-email/resend")
       .send({ userType: "student", email: "t3_verify_student@test.dev" })
       .expect(200);
-    const first = lastTokenFromOutbox();
+    const first = lastTokenFromOutbox("verify");
     await request(app)
       .post("/api/auth/verify-email/resend")
       .send({ userType: "student", email: "t3_verify_student@test.dev" })
       .expect(200);
-    const second = lastTokenFromOutbox();
+    const second = lastTokenFromOutbox("verify");
     expect(second).not.toBe(first);
     const stale = await request(app)
       .post("/api/auth/verify-email/confirm")
@@ -386,12 +401,18 @@ describe("email verification", () => {
 
   it("applies tokens to their own account only", async () => {
     await registerStudent("t3_cross_a");
-    await registerStudent("t3_cross_b");
+    const direct = await request(app).post("/api/auth/register").send({
+      name: "t3_cross_b Name",
+      username: "t3_cross_b",
+      email: "t3_cross_b@test.dev",
+      password: "student123",
+    });
+    expect(direct.status).toBe(201);
     await request(app)
       .post("/api/auth/verify-email/resend")
       .send({ userType: "student", email: "t3_cross_a@test.dev" })
       .expect(200);
-    const raw = lastTokenFromOutbox();
+    const raw = lastTokenFromOutbox("verify");
     await request(app).post("/api/auth/verify-email/confirm").send({ token: raw }).expect(200);
     const a = await prisma.student.findUnique({ where: { username: "t3_cross_a" }, select: { emailVerified: true } });
     const b = await prisma.student.findUnique({ where: { username: "t3_cross_b" }, select: { emailVerified: true } });

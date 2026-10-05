@@ -4,6 +4,7 @@ import { endpoints, toApiError } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import TeacherImage from "../components/TeacherImage.jsx";
 import { ErrorBox, Loader } from "../components/ui.jsx";
+import { formatDate, formatPrice } from "../utils/format.js";
 
 // Student subscription workflow (backend: subscription.controller):
 // 1. GET /api/subscriptions/teacher/:teacherId -> teacher + plans + active state
@@ -19,6 +20,7 @@ export default function Subscribe() {
   const [error, setError] = useState(null);
   const [confirmError, setConfirmError] = useState(null);
   const [done, setDone] = useState(null);
+  const [pending, setPending] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +47,24 @@ export default function Subscribe() {
     setConfirming(true);
     try {
       const result = await endpoints.confirmPayment({ teacherId: Number(teacherId), duration });
+      if (result && result.subscription) {
+        setDone(result);
+      } else {
+        setPending(result.intent || result);
+      }
+    } catch (err) {
+      setConfirmError(toApiError(err));
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  async function handleWebhookComplete() {
+    setConfirmError(null);
+    setConfirming(true);
+    try {
+      const result = await endpoints.subscriptionWebhook({ teacherId: Number(teacherId), duration });
+      setPending(null);
       setDone(result);
     } catch (err) {
       setConfirmError(toApiError(err));
@@ -79,7 +99,7 @@ export default function Subscribe() {
       {data.hasActiveSubscription ? (
         <div className="alert alert-success" role="status">
           You already have an active subscription with this teacher
-          {data.activeSubscription ? ` until ${new Date(data.activeSubscription.endDate).toLocaleDateString()}` : ""}.
+          {data.activeSubscription ? ` until ${formatDate(data.activeSubscription.endDate)}` : ""}.
           <div className="btn-row" style={{ marginTop: "0.75rem" }}>
             <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate(`/content/teacher/${teacherId}`)}>
               Go to content
@@ -92,6 +112,15 @@ export default function Subscribe() {
           <div className="btn-row" style={{ marginTop: "0.75rem" }}>
             <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate(`/content/teacher/${teacher.id || teacherId}`)}>
               Go to content
+            </button>
+          </div>
+        </div>
+      ) : pending ? (
+        <div className="alert alert-success" role="status">
+          Payment pending with {pending.provider || "provider"} for {pending.duration} ({formatPrice(pending.price)}). Complete payment, then activate below.
+          <div className="btn-row" style={{ marginTop: "0.75rem" }}>
+            <button type="button" className="btn btn-dark btn-sm" disabled={confirming} onClick={handleWebhookComplete}>
+              {confirming ? "Activating..." : "Complete via gateway webhook"}
             </button>
           </div>
         </div>
@@ -109,7 +138,7 @@ export default function Subscribe() {
                   onChange={() => setDuration(plan.duration)}
                 />
                 <span className="plan-label">{plan.label}</span>
-                <span className="plan-price">{String(plan.price)}</span>
+                <span className="plan-price">{formatPrice(plan.price)}</span>
               </label>
             ))}
           </div>

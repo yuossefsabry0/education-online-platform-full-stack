@@ -56,6 +56,16 @@ export default function AdminTeachers() {
     e.preventDefault();
     setFormError(null);
     setFormOk(null);
+    for (const f of priceFields) {
+      if (form[f] === "" || form[f] === null || form[f] === undefined) {
+        setFormError({ message: `${f} is required`, details: [{ field: f, message: `${f} is required` }] });
+        return;
+      }
+      if (!Number.isFinite(Number(form[f]))) {
+        setFormError({ message: `${f} must be a number`, details: [{ field: f, message: `${f} must be a number` }] });
+        return;
+      }
+    }
     setSaving(true);
     const body = {
       name: form.name,
@@ -121,8 +131,9 @@ export default function AdminTeachers() {
         <>
           <div className="table-wrap">
             <table className="data-table">
+              <caption className="muted small">Teachers</caption>
               <thead>
-                <tr><th>ID</th><th>Name</th><th>Username</th><th>Subject</th><th>Grade</th><th>Active</th><th>Actions</th></tr>
+                <tr><th scope="col">ID</th><th scope="col">Name</th><th scope="col">Username</th><th scope="col">Subject</th><th scope="col">Grade</th><th scope="col">Active</th><th scope="col">Actions</th></tr>
               </thead>
               <tbody>
                 {teachers.map((t) => (

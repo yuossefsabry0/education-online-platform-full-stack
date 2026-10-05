@@ -55,7 +55,7 @@ const config = {
   },
   storage: {
     root: process.env.UPLOAD_DIR || "uploads",
-    maxBytes: 10 * 1024 * 1024,
+    maxBytes: parseInt(process.env.UPLOAD_MAX_BYTES, 10) || 10 * 1024 * 1024,
   },
   // Rate limiting can be disabled per environment (RATE_LIMIT_ENABLED=false);
   // integration tests rely on this so they never trip the auth limits.
@@ -65,5 +65,20 @@ const config = {
       process.env.RATE_LIMIT_ENABLED !== "0",
   },
 };
+
+if (config.env === "production") {
+  if (config.jwt.accessSecret === "dev_access_secret_change_me") {
+    throw new Error("JWT_ACCESS_SECRET must be set in production");
+  }
+  if (config.jwt.refreshSecret === "dev_refresh_secret_change_me") {
+    throw new Error("JWT_REFRESH_SECRET must be set in production");
+  }
+  if (!config.database.password) {
+    throw new Error("DATABASE_PASSWORD must be set in production");
+  }
+  if (config.mail.provider === "log") {
+    throw new Error("MAIL_PROVIDER must be set to smtp in production");
+  }
+}
 
 module.exports = config;

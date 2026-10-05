@@ -2,6 +2,7 @@ const request = require("supertest");
 const bcrypt = require("bcryptjs");
 const app = require("../../src/app");
 const prisma = require("../../src/db/prisma");
+const mailer = require("../../src/utils/mailer");
 const { activateSubscription } = require("../../src/controllers/subscription.controller");
 
 function expectSuccessShape(res) {
@@ -25,6 +26,12 @@ function cookieOf(res) {
 async function registerStudent(payload) {
   const res = await request(app).post("/api/auth/register").send(payload);
   expect(res.status).toBe(201);
+  const out = mailer.getOutbox();
+  const entry = [...out].reverse().find((e) => e.to === payload.email);
+  expect(entry).toBeTruthy();
+  const m = entry && entry.text ? String(entry.text).match(/[a-f0-9]{64}/) : null;
+  expect(m).not.toBeNull();
+  await request(app).post("/api/auth/verify-email/confirm").send({ token: m[0] }).expect(200);
   return res;
 }
 
@@ -154,7 +161,7 @@ beforeAll(async () => {
       teacherRole: `SUB${S.tMix.id}`,
       duration: "ONE_MONTH",
       price: 60,
-      startDate: past,
+      startDate: new Date(now.getTime() - 40 * 86400000),
       endDate: past,
       status: "ACTIVE",
     },
@@ -192,6 +199,24 @@ afterAll(async () => {
     await prisma.refreshToken.deleteMany({
       where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] },
     });
+    await prisma.passwordResetToken.deleteMany({
+      where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] },
+    });
+    await prisma.emailVerificationToken.deleteMany({
+      where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] },
+    });
+    const subs = await prisma.subscription.findMany({
+      where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] },
+      select: { id: true },
+    });
+    const files = await prisma.teacherContent.findMany({
+      where: { teacherId: { in: tIds } },
+      select: { id: true },
+    });
+    const logTargets = [...subs.map((s) => String(s.id)), ...files.map((f) => String(f.id))];
+    if (logTargets.length) {
+      await prisma.logHistory.deleteMany({ where: { targetId: { in: logTargets } } });
+    }
     await prisma.subscription.deleteMany({
       where: { OR: [{ studentId: { in: sIds } }, { teacherId: { in: tIds } }] },
     });
@@ -313,17 +338,17 @@ describe("cookie session and rotation", () => {
   });
 });
 
-describe("teacher income and subscribers use the active rule", () => {
-  it("counts only the active subscription in income buckets", async () => {
+describe("teacher income counts paid subscriptions excluding cancelled", () => {
+  it("sums active and expired subscriptions in income buckets", async () => {
     const tLogin = await loginCookie("teacher", "t1_mix_teacher", "teacher123");
     const res = await request(app)
       .get("/api/teacher/dashboard/income")
       .set("Authorization", `Bearer ${tLogin.token}`)
       .expect(200);
     expectSuccessShape(res);
-    expect(Number(res.body.data.income.currentMonth)).toBe(S.priceMix);
-    expect(Number(res.body.data.income.last3Months)).toBe(S.priceMix);
-    expect(Number(res.body.data.income.year)).toBe(S.priceMix);
+    expect(Number(res.body.data.income.currentMonth)).toBe(S.priceMix * 2);
+    expect(Number(res.body.data.income.last3Months)).toBe(S.priceMix * 3);
+    expect(Number(res.body.data.income.year)).toBe(S.priceMix * 3);
   });
 
   it("lists only the active subscriber", async () => {
@@ -336,6 +361,19 @@ describe("teacher income and subscribers use the active rule", () => {
     expect(res.body.data.totalSubscribers).toBe(1);
     expect(res.body.data.subscribers.length).toBe(1);
     expect(res.body.data.subscribers[0].username).toBe("t1_s_active");
+  });
+
+  it("filters subscribers by explicit status with pagination", async () => {
+    const tLogin = await loginCookie("teacher", "t1_mix_teacher", "teacher123");
+    const cancelled = await request(app)
+      .get("/api/teacher/dashboard/subscribers")
+      .query({ status: "CANCELLED" })
+      .set("Authorization", `Bearer ${tLogin.token}`)
+      .expect(200);
+    expectSuccessShape(cancelled);
+    expect(cancelled.body.data.totalSubscribers).toBe(1);
+    expect(cancelled.body.data.subscribers[0].username).toBe("t1_s_cancelled");
+    expect(cancelled.body.data.pagination).toMatchObject({ page: 1 });
   });
 
   it("reports zero income for a teacher with no subscriptions", async () => {

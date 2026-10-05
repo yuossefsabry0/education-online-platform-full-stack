@@ -3,11 +3,13 @@
   "info": {
     "title": "Education System API",
     "version": "1.0.0",
-    "description": "Backend API for the Education System project. All responses use the wrapper `{ success, data, error }`. Success: `success: true`, `data: <payload>`, `error: null`. Failure: `success: false`, `data: null`, `error: { code, message, details }`."
+    "description": "Backend API for the Education System project. All responses use the wrapper `{ success, data, error }`. Success: `success: true`, `data: <payload>`, `error: null`. Failure: `success: false`, `data: null`, `error: { code, message, details }`. Every route is served under both /api and /api/v1 for one release. List endpoints share one pagination envelope { items, pagination: { page, limit, total, totalPages } } with limit max 50 and default 10. Common error codes: VALIDATION_ERROR (400), INVALID_JSON (400), UNSUPPORTED_FILE_TYPE (400), FILE_REQUIRED (400), UNAUTHORIZED (401), INVALID_CREDENTIALS (401), INVALID_CURRENT_PASSWORD (401), INVALID_RESET_TOKEN (401), INVALID_VERIFICATION_TOKEN (401), REFRESH_TOKEN_EXPIRED (401), REFRESH_TOKEN_REVOKED (401), INVALID_WEBHOOK_SIGNATURE (401), FORBIDDEN (403), SUBSCRIPTION_REQUIRED (403), NO_ACTIVE_SUBSCRIPTION (403), EMAIL_NOT_VERIFIED (403), TEACHER_NOT_FOUND (404), SUBSCRIPTION_NOT_FOUND (404), NOT_FOUND (404), SECTION_NOT_FOUND (404), ACTIVE_SUBSCRIPTION_EXISTS (409), SUBSCRIPTION_NOT_ACTIVE (409), ACTIVE_SUBSCRIPTIONS_EXIST (409), DUPLICATE_FIELD (409), AMBIGUOUS_USERNAME (409), FILE_TOO_LARGE (413), RATE_LIMIT_EXCEEDED (429). ACTIVE_SUBSCRIPTION_EXISTS means the calling student already holds one; ACTIVE_SUBSCRIPTIONS_EXIST means an admin delete is blocked by subscribers."
   },
   "servers": [
-    { "url": "{{BASE_URL}}/api", "description": "Uses the BASE_URL Postman variable (local/staging/production)" },
-    { "url": "http://localhost:5000/api", "description": "Local development" }
+    { "url": "http://localhost:5000/api", "description": "Local development" },
+    { "url": "http://localhost:5000/api/v1", "description": "Versioned alias, same routes as /api for one release" },
+    { "url": "https://staging.education-system.example.com/api", "description": "Staging" },
+    { "url": "https://api.education-system.example.com/api", "description": "Production" }
   ],
   "tags": [
     { "name": "Health" },
@@ -170,7 +172,7 @@
           "type": { "type": "string", "enum": ["LECTURE", "LESSON_CONTENT", "HOMEWORK"] },
           "title": { "type": "string", "example": "Algebra basics" },
           "body": { "type": "string", "nullable": true },
-          "fileUrl": { "type": "string", "nullable": true },
+          "fileUrl": { "type": "string", "nullable": true, "description": "Same-origin /api/files/<name> path or allowlisted host (FILE_URL_ALLOWED_HOSTS)" },
           "isPublished": { "type": "boolean", "default": true }
         }
       },
@@ -180,7 +182,7 @@
           "type": { "type": "string", "enum": ["LECTURE", "LESSON_CONTENT", "HOMEWORK"] },
           "title": { "type": "string" },
           "body": { "type": "string", "nullable": true },
-          "fileUrl": { "type": "string", "nullable": true },
+          "fileUrl": { "type": "string", "nullable": true, "description": "Same-origin /api/files/<name> path or allowlisted host (FILE_URL_ALLOWED_HOSTS)" },
           "isPublished": { "type": "boolean" }
         }
       }
@@ -199,10 +201,39 @@
         }
       }
     },
+    "/ready": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness check with database probe",
+        "description": "Runs SELECT 1 against the database. Returns 503 NOT_READY when the database is unreachable.",
+        "responses": {
+          "200": {
+            "description": "Database is reachable",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Success" } } }
+          },
+          "503": { "description": "Database not ready" }
+        }
+      }
+    },
+    "/v1/ready": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness check with database probe (versioned alias)",
+        "description": "Same as /ready, served under the /api/v1 alias.",
+        "responses": {
+          "200": {
+            "description": "Database is reachable",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Success" } } }
+          },
+          "503": { "description": "Database not ready" }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "tags": ["Auth"],
         "summary": "Register a new student (strict rate limited)",
+        "description": "Creates the student and auto-sends a 24-hour email-verification token. Subscribing requires a verified email.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterStudent" } } }
@@ -318,7 +349,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Resend an email-verification token",
-        "description": "Rate limited to 5 requests per hour per IP. Always returns the same generic message (no enumeration). A new token valid for 24 hours invalidates prior pending tokens. Verification never blocks login.",
+        "description": "Rate limited to 5 requests per hour per IP. Always returns the same generic message (no enumeration). A new token valid for 24 hours invalidates prior pending tokens. Verification never blocks login, but subscribing requires a verified email (403 EMAIL_NOT_VERIFIED otherwise). userType is optional and helps when one email exists in several account tables.",
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VerifyResend" } } }
@@ -360,10 +391,11 @@
       "get": {
         "tags": ["Teachers"],
         "summary": "List teachers (public sees limited fields; admin sees full data with prices)",
-        "security": [{ "BearerAuth": [] }],
+        "description": "Optional authentication: no token returns the public view, an admin token returns full data. Security is optional on this route.",
+        "security": [],
         "parameters": [
-          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number" },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 }, "description": "Items per page" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number (default 1)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" },
           { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["id", "name", "subject", "gradeClass", "username", "email", "createdAt", "updatedAt"] } },
           { "name": "sortOrder", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } }
         ],
@@ -374,11 +406,12 @@
       "get": {
         "tags": ["Teachers"],
         "summary": "Search teachers by name (with fuzzy fallback)",
-        "security": [{ "BearerAuth": [] }],
+        "description": "Optional authentication. q filters names (case-insensitive contains, max 100 chars); empty q returns an empty list, use GET /teachers for browsing. limit max 50, default 10.",
+        "security": [],
         "parameters": [
           { "name": "q", "in": "query", "schema": { "type": "string" } },
           { "name": "page", "in": "query", "schema": { "type": "integer" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "maximum": 50 } },
           { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
           { "name": "sortOrder", "in": "query", "schema": { "type": "string" } }
         ],
@@ -412,11 +445,13 @@
       "get": {
         "tags": ["User"],
         "summary": "Own subscription and activity history (student only)",
-        "description": "Returns { subscriptions: { items, pagination }, events: { items, pagination } }. Subscription items expose id, duration, price, startDate, endDate, status, teacherRole and teacher { id, name, subject }. Events expose id, actionType, targetId, timestamp and details. No other users' data is included.",
+        "description": "Returns { subscriptions: { items, pagination }, events: { items, pagination } }. Events include the student's own actions plus system notifications (actorType STUDENT or SYSTEM) such as expiry and cancellation notices. subPage/eventPage paginate each list independently and fall back to page.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
-          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number (default 1)" },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" }
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number for both lists (default 1)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" },
+          { "name": "subPage", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Subscriptions page, overrides page" },
+          { "name": "eventPage", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Events page, overrides page" }
         ],
         "responses": {
           "200": { "description": "Paginated own history" },
@@ -452,17 +487,44 @@
     "/subscriptions/confirm-payment": {
       "post": {
         "tags": ["Subscriptions"],
-        "summary": "Confirm payment and activate a subscription (student only)",
+        "summary": "Confirm payment intent (student only)",
+        "description": "With PAYMENT_PROVIDER=log (development) the subscription is activated immediately (201). With a real provider the endpoint returns 202 with a payment intent and only POST /subscriptions/webhook creates the subscription. Requires a verified student email (403 EMAIL_NOT_VERIFIED otherwise).",
         "security": [{ "BearerAuth": [] }],
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmPayment" } } }
         },
         "responses": {
-          "201": { "description": "Subscription activated" },
+          "201": { "description": "Subscription activated (log provider)" },
+          "202": { "description": "Payment intent created, complete payment then call the webhook" },
           "403": { "description": "Not a student" },
           "404": { "description": "Teacher not found" },
-          "409": { "description": "Already has an active subscription" }
+          "409": { "description": "Already has an active subscription (ACTIVE_SUBSCRIPTION_EXISTS)" },
+          "429": { "description": "Too many payment attempts" }
+        }
+      }
+    },
+    "/subscriptions/webhook": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "summary": "Payment gateway webhook, sole subscription creator",
+        "description": "Server-to-server callback: with a real provider the x-payment-signature header must match PAYMENT_WEBHOOK_SECRET and the body carries studentId, otherwise 401 INVALID_WEBHOOK_SIGNATURE. With PAYMENT_PROVIDER=log a student JWT is required instead. Requires a verified student email (403 EMAIL_NOT_VERIFIED otherwise).",
+        "security": [],
+        "parameters": [
+          { "name": "x-payment-signature", "in": "header", "required": false, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmPayment" } } }
+        },
+        "responses": {
+          "201": { "description": "Subscription activated" },
+          "400": { "description": "Validation failed" },
+          "401": { "description": "Invalid webhook signature" },
+          "403": { "description": "Not a student" },
+          "404": { "description": "Teacher not found" },
+          "409": { "description": "Already has an active subscription (ACTIVE_SUBSCRIPTION_EXISTS)" },
+          "429": { "description": "Too many payment attempts" }
         }
       }
     },
@@ -480,7 +542,7 @@
           "401": { "description": "Authentication required" },
           "403": { "description": "Not the owning student" },
           "404": { "description": "Not found" },
-          "409": { "description": "Not active" }
+          "409": { "description": "Not active (SUBSCRIPTION_NOT_ACTIVE)" }
         }
       }
     },
@@ -522,10 +584,12 @@
       "get": {
         "tags": ["Content"],
         "summary": "Download an uploaded file by generated name",
-        "description": "Authorization matches the owning content gates: admins allow, owning teachers allow, students require an active subscription to the owning teacher's published content.",
+        "description": "Authorization matches the owning content gates: admins allow, owning teachers allow, students require an active subscription to the owning teacher's published content. Pass contentId to authorize against one specific content row; without it every row referencing the file must belong to covered teachers.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
-          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "contentId", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "Authorize against one specific content row" },
+          { "name": "download", "in": "query", "required": false, "schema": { "type": "string", "enum": ["1"] }, "description": "Set to 1 for Content-Disposition attachment instead of inline" }
         ],
         "responses": {
           "200": { "description": "File bytes with the stored content type" },
@@ -539,11 +603,11 @@
       "get": {
         "tags": ["Teacher Dashboard"],
         "summary": "Teacher's own dashboard with their content (teacher role)",
-        "description": "Content list ordered by createdAt ASC with page/limit/q support (defaults page 1, limit 10, max 50) and a pagination envelope; the paginated items are grouped into sections. q filters titles (case-insensitive contains).",
+        "description": "Content grouped per section (lectures, lesson-content, homework). page/limit/q apply to every section and each section carries its own pagination envelope.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 }, "description": "Page number (default 1)" },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per page (default 10, max 50)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 }, "description": "Items per section page (default 10, max 50)" },
           { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Title search text" }
         ],
         "responses": { "200": { "description": "Dashboard" } }
@@ -553,7 +617,13 @@
       "get": {
         "tags": ["Teacher Dashboard"],
         "summary": "List of subscribers for the logged-in teacher (teacher role)",
+        "description": "Omitting status applies the active rule (ACTIVE status with endDate in the future). status filters by exact status. Paginated with page/limit (max 50).",
         "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "EXPIRED", "CANCELLED"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50 } }
+        ],
         "responses": { "200": { "description": "Subscribers" } }
       }
     },
@@ -561,6 +631,7 @@
       "get": {
         "tags": ["Teacher Dashboard"],
         "summary": "Income for this month, last 3 months and year (teacher role)",
+        "description": "Sums paid subscriptions (ACTIVE plus EXPIRED) by startDate. CANCELLED subscriptions are excluded.",
         "security": [{ "BearerAuth": [] }],
         "responses": { "200": { "description": "Income summary" } }
       }
@@ -581,7 +652,7 @@
       "post": {
         "tags": ["Teacher Dashboard"],
         "summary": "Upload a file for own content (teacher role)",
-        "description": "Multipart form with a single 'file' field. Allowed types: png, jpg/jpeg, webp, gif, pdf, mp4; max 10MB; stored under a generated random name. Returns { fileUrl, fileName, mimeType, size } where fileUrl is a same-origin /api/files/<name> path.",
+        "description": "Multipart form with a single 'file' field. Allowed types: png, jpg/jpeg, webp, gif, pdf, mp4; max 10MB; stored under a generated random name. Returns { fileUrl, name, mimeType, size } where fileUrl is a same-origin /api/files/<name> path.",
         "security": [{ "BearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -648,6 +719,7 @@
       "get": {
         "tags": ["Admin"],
         "summary": "Total platform income (admin only)",
+        "description": "Sums paid subscriptions (CANCELLED excluded). Returns { totalIncome, totalPayments, cancelledPayments }.",
         "security": [{ "BearerAuth": [] }],
         "responses": { "200": { "description": "Income summary" } }
       }
@@ -678,13 +750,14 @@
       "delete": {
         "tags": ["Admin"],
         "summary": "Soft-delete teacher (admin only; blocked while teacher has active subscribers)",
+        "description": "Sets isActive false, never hard-deletes: subscription rows are RESTRICT-protected and preserved for finance. Prices are CHECK-guarded non-negative and endDate must be after startDate.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }
         ],
         "responses": {
           "200": { "description": "Teacher soft-deleted" },
-          "409": { "description": "Teacher has active subscribers" }
+          "409": { "description": "Teacher has active subscribers (ACTIVE_SUBSCRIPTIONS_EXIST)" }
         }
       }
     },
@@ -719,7 +792,7 @@
       "post": {
         "tags": ["Admin"],
         "summary": "Upload a file for a teacher's content (admin only)",
-        "description": "Multipart form with a single 'file' field. Allowed types: png, jpg/jpeg, webp, gif, pdf, mp4; max 10MB; stored under a generated random name. Returns { fileUrl, fileName, mimeType, size }.",
+        "description": "Multipart form with a single 'file' field. Allowed types: png, jpg/jpeg, webp, gif, pdf, mp4; max 10MB; stored under a generated random name. Returns { fileUrl, name, mimeType, size }.",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           { "name": "teacherId", "in": "path", "required": true, "schema": { "type": "integer" } }

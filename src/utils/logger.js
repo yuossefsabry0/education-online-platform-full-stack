@@ -93,7 +93,7 @@ function requestLogger(req, res, next) {
     const durationMs = Date.now() - startedAt;
     logger.info(
       `${req.method} ${req.originalUrl} -> ${res.statusCode}`,
-      { durationMs, ip: req.ip }
+      { durationMs, ip: req.ip, reqId: req.id }
     );
   });
   next();

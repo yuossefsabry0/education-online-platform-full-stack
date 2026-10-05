@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const cors = require("cors");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
@@ -12,6 +13,8 @@ const swaggerDocument = require("../docs/swagger.json");
 const { resolveCorsOrigins, buildCorsOptions } = require("./config/cors");
 
 const app = express();
+
+app.set("trust proxy", 1);
 
 app.use(helmet());
 
@@ -46,8 +49,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Server-side operational log of every incoming request.
-app.use(requestLogger);
+app.use((req, res, next) => {
+  try {
+    req.id = crypto.randomBytes(8).toString("hex");
+  } catch {
+    req.id = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  }
+  next();
+});
+
+app.use((req, res, next) => {
+  if (req.path === "/api/health" || req.path === "/health" || req.path === "/api/v1/health" || req.path === "/api/v1/ready") return next();
+  return requestLogger(req, res, next);
+});
 
 // Swagger UI documentation (served on /api-docs) for browsing all endpoints.
 app.use(
@@ -60,6 +74,7 @@ app.use(
 
 // Global burst protection for every API route.
 app.use("/api", apiLimiter, routes);
+app.use("/api/v1", apiLimiter, routes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

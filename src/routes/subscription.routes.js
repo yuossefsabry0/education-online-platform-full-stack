@@ -1,8 +1,9 @@
 const { Router } = require("express");
-const { requireAuth } = require("../middlewares/auth");
+const { requireAuth, optionalAuth } = require("../middlewares/auth");
 const validate = require("../middlewares/validate");
 const subscriptionController = require("../controllers/subscription.controller");
-const { confirmPaymentSchema } = require("../validations/subscription.schema");
+const { confirmPaymentSchema, webhookSchema } = require("../validations/subscription.schema");
+const { paymentLimiter } = require("../middlewares/rateLimiter");
 
 const router = Router();
 
@@ -25,8 +26,17 @@ router.get(
 router.post(
   "/confirm-payment",
   requireAuth,
+  paymentLimiter,
   validate(confirmPaymentSchema),
   subscriptionController.confirmPayment
+);
+
+router.post(
+  "/webhook",
+  optionalAuth,
+  paymentLimiter,
+  validate(webhookSchema),
+  subscriptionController.subscriptionWebhook
 );
 
 router.post(

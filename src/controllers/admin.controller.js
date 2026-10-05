@@ -5,6 +5,7 @@ const { success, error } = require("../utils/apiResponse");
 const { activeSubscriptionWhere } = require("../utils/subscriptionStatus");
 const { httpError } = require("../utils/httpError");
 const { toMoneyString } = require("../utils/money");
+const { deriveTeacherRole } = require("../utils/teacherRole");
 const { claimNotification, sendCancellationNotice } = require("../utils/subscriptionNotify");
 const {
   idParam,
@@ -176,17 +177,22 @@ async function listTeacherSubscribers(req, res, next) {
 
 async function getTotalIncome(req, res, next) {
   try {
-    const aggregation = await prisma.subscription.aggregate({
-      _sum: { price: true },
-      _count: true,
-    });
+    const [paid, cancelled] = await Promise.all([
+      prisma.subscription.aggregate({
+        _sum: { price: true },
+        _count: true,
+        where: { status: { not: "CANCELLED" } },
+      }),
+      prisma.subscription.count({ where: { status: "CANCELLED" } }),
+    ]);
 
-    const raw = aggregation._sum.price;
+    const raw = paid._sum.price;
     const totalIncome = toMoneyString(raw === null || raw === undefined ? null : raw.toString());
 
     return success(res, {
       totalIncome,
-      totalPayments: aggregation._count,
+      totalPayments: paid._count,
+      cancelledPayments: cancelled,
     });
   } catch (err) {
     next(err);
@@ -255,7 +261,7 @@ async function getTeacherDetail(req, res, next) {
 
     return success(res, {
       teacher: safeTeacher,
-      role: `SUB${teacherId}`,
+      role: deriveTeacherRole(teacherId),
     });
   } catch (err) {
     next(err);

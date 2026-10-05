@@ -26,6 +26,14 @@ function isStudent(user) {
   return !!(user && user.userType === "student");
 }
 
+async function requireVerifiedStudent(studentId) {
+  const row = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { emailVerified: true },
+  });
+  return !!(row && row.emailVerified);
+}
+
 // Fix Task 5: MySQL reports the (studentId, activeSubscriptionKey) unique-index
 // violation as a Prisma P2002 known request error. This predicate recognizes
 // ONLY that constraint, so the application-level duplicate check remains the
@@ -53,6 +61,9 @@ function isOneActiveSubscriptionConstraintError(err) {
   const adapterError = meta.driverAdapterError;
   const cause = adapterError && adapterError.cause;
   const constraint = cause && cause.constraint;
+  if (typeof constraint === "string") {
+    return constraint.includes("activeSubscriptionKey");
+  }
   if (!constraint) return false;
 
   const fields = constraint.fields || constraint.columns;
@@ -293,12 +304,103 @@ async function confirmPayment(req, res, next) {
   const { teacherId, duration } = req.body;
 
   try {
+    if (!(await requireVerifiedStudent(req.user.id))) {
+      return error(res, "Verify your email before subscribing", 403, "EMAIL_NOT_VERIFIED");
+    }
+    if (paymentProvider() !== "log") {
+      const intent = await buildPaymentIntent(teacherId, duration);
+      if (!intent) {
+        return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
+      }
+      return success(
+        res,
+        {
+          message: "Payment pending. Complete payment with the configured provider, then the webhook activates the subscription.",
+          intent,
+        },
+        202
+      );
+    }
     const subscription = await activateSubscription({
       studentId: req.user.id,
       teacherId,
       duration,
     });
 
+    return success(
+      res,
+      {
+        message: "Payment confirmed. Subscription activated.",
+        subscription,
+      },
+      201
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+function paymentProvider() {
+  return String(process.env.PAYMENT_PROVIDER || "log");
+}
+
+async function buildPaymentIntent(teacherId, duration) {
+  if (!DURATIONS.includes(duration)) {
+    throw httpError(400, "VALIDATION_ERROR", "Validation failed", [
+      { field: "duration", message: `duration must be one of: ${DURATIONS.join(", ")}` },
+    ]);
+  }
+  const teacher = await prisma.teacher.findFirst({
+    where: { id: teacherId, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      price1Month: true,
+      price3Months: true,
+      price6Months: true,
+      price1Year: true,
+    },
+  });
+  if (!teacher) return null;
+  return {
+    provider: paymentProvider(),
+    teacherId: teacher.id,
+    teacherName: teacher.name,
+    duration,
+    price: teacher[DURATION_PRICE_FIELD[duration]],
+  };
+}
+
+async function subscriptionWebhook(req, res, next) {
+  const gateway = paymentProvider() !== "log";
+  if (gateway) {
+    const expected = process.env.PAYMENT_WEBHOOK_SECRET;
+    const provided = req.headers["x-payment-signature"];
+    if (!expected || provided !== expected) {
+      return error(res, "Invalid webhook signature", 401, "INVALID_WEBHOOK_SIGNATURE");
+    }
+  } else if (!isStudent(req.user)) {
+    return error(
+      res,
+      "Only students can subscribe to teachers",
+      403,
+      "FORBIDDEN"
+    );
+  }
+  const { teacherId, duration } = req.body;
+  const studentId = isStudent(req.user) ? req.user.id : req.body.studentId;
+  if (!Number.isInteger(studentId) || studentId <= 0) {
+    return error(res, "studentId must be a positive integer", 400, "VALIDATION_ERROR");
+  }
+  try {
+    if (!(await requireVerifiedStudent(studentId))) {
+      return error(res, "Verify your email before subscribing", 403, "EMAIL_NOT_VERIFIED");
+    }
+    const subscription = await activateSubscription({
+      studentId,
+      teacherId,
+      duration,
+    });
     return success(
       res,
       {
@@ -469,4 +571,4 @@ async function cancelMine(req, res, next) {
   }
 }
 
-module.exports = { showPlans, confirmPayment, listMine, cancelMine, cancelOwnSubscription, activateSubscription, DURATION_PRICE_FIELD };
+module.exports = { showPlans, confirmPayment, subscriptionWebhook, listMine, cancelMine, cancelOwnSubscription, activateSubscription, DURATION_PRICE_FIELD };

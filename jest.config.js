@@ -12,4 +12,13 @@ module.exports = {
   testMatch: ["<rootDir>/tests/**/*.test.js"],
   verbose: true,
   maxWorkers: 1,
+  collectCoverage: false,
+  coverageThreshold: {
+    global: {
+      statements: 75,
+      branches: 55,
+      functions: 85,
+      lines: 80,
+    },
+  },
 };

@@ -1,10 +1,27 @@
 const { isAcceptedFileUrl } = require("../../src/utils/fileUrl");
 
 describe("fileUrl acceptance", () => {
-  it("accepts https and http urls", () => {
+  it("accepts allowlisted https and http urls", () => {
     expect(isAcceptedFileUrl("https://media.example.com/a.mp4")).toBe(true);
     expect(isAcceptedFileUrl("http://media.example.com/a.mp4")).toBe(true);
     expect(isAcceptedFileUrl("https://media.example.com/".padEnd(500, "a"))).toBe(true);
+  });
+
+  it("accepts same-origin stored file paths", () => {
+    expect(isAcceptedFileUrl(`/api/files/${"b".repeat(32)}.png`)).toBe(true);
+  });
+
+  it("rejects non-allowlisted external hosts", () => {
+    const prev = process.env.FILE_URL_ALLOWED_HOSTS;
+    process.env.FILE_URL_ALLOWED_HOSTS = "";
+    try {
+      expect(isAcceptedFileUrl("https://media.example.com/a.mp4")).toBe(false);
+      expect(isAcceptedFileUrl("https://evil.example.com/a.mp4")).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.FILE_URL_ALLOWED_HOSTS;
+      else process.env.FILE_URL_ALLOWED_HOSTS = prev;
+    }
+    expect(isAcceptedFileUrl("https://evil.example.com/a.mp4")).toBe(false);
   });
 
   it("rejects javascript scheme variants", () => {

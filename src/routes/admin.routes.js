@@ -11,6 +11,7 @@ const {
   editContentSchema,
 } = require("../validations/content.schema");
 const uploadController = require("../controllers/upload.controller");
+const { uploadLimiter } = require("../middlewares/rateLimiter");
 
 const router = Router();
 
@@ -56,6 +57,7 @@ router.delete(
 );
 router.post(
   "/teachers/:teacherId/content/upload",
+  uploadLimiter,
   uploadController.uploadSingle,
   uploadController.uploadTeacherFileAsAdmin
 );

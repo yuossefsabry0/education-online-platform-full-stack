@@ -40,8 +40,34 @@ export default function Teachers() {
   );
 
   useEffect(() => {
+    if (userType === "teacher") {
+      setLoading(false);
+      return;
+    }
     fetchTeachers(appliedQuery, page);
-  }, [fetchTeachers, appliedQuery, page]);
+  }, [fetchTeachers, appliedQuery, page, userType]);
+
+  if (userType === "teacher") {
+    return (
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1>Teachers</h1>
+            <p className="muted">Teacher accounts focus on their own dashboard and content.</p>
+          </div>
+        </div>
+        <EmptyState
+          title="Not available for teacher accounts"
+          hint="Browsing other teachers is disabled for teachers. Go to your dashboard to manage your lessons and students."
+        />
+        <div className="btn-row" style={{ marginTop: "1rem" }}>
+          <button type="button" className="btn btn-dark btn-sm" onClick={() => navigate("/teacher/dashboard")}>
+            Go to my dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   function handleSearch(e) {
     e.preventDefault();
@@ -107,26 +133,32 @@ export default function Teachers() {
                     {teacher.subject} · {teacher.gradeClass}
                   </p>
                   <div className="btn-row">
-                    <button
-                      type="button"
-                      className="btn btn-dark btn-sm"
-                      onClick={() => navigate(`/teachers/${teacher.id}/subscribe`)}
-                    >
-                      Subscribe
-                    </button>
-                    {(userType === "student" || !userType) && (
+                    {userType === "student" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-dark btn-sm"
+                          onClick={() => navigate(`/teachers/${teacher.id}/subscribe`)}
+                        >
+                          Subscribe
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => navigate(`/content/teacher/${teacher.id}`)}
+                        >
+                          View content
+                        </button>
+                      </>
+                    ) : !userType ? (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
-                        onClick={() =>
-                          userType === "student"
-                            ? navigate(`/content/teacher/${teacher.id}`)
-                            : navigate("/login", { state: { from: `/content/teacher/${teacher.id}` } })
-                        }
+                        onClick={() => navigate("/login", { state: { from: `/content/teacher/${teacher.id}` } })}
                       >
                         View content
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </article>

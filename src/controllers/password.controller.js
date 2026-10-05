@@ -128,10 +128,17 @@ async function requestReset(req, res, next) {
 async function confirmReset(req, res, next) {
   try {
     const { token, newPassword } = req.body;
+    const claimed = await prisma.passwordResetToken.updateMany({
+      where: { tokenHash: hashToken(token), usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    if (claimed.count !== 1) {
+      return error(res, "Invalid or expired reset token", 401, "INVALID_RESET_TOKEN");
+    }
     const stored = await prisma.passwordResetToken.findUnique({
       where: { tokenHash: hashToken(token) },
     });
-    if (!stored || stored.usedAt || stored.expiresAt <= new Date()) {
+    if (!stored || stored.expiresAt <= new Date()) {
       return error(res, "Invalid or expired reset token", 401, "INVALID_RESET_TOKEN");
     }
     const userType =

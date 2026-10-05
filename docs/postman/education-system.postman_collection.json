@@ -121,9 +121,6 @@
               "script": {
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.success && json.data.refreshToken) {",
-                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
-                  "}",
                   "if (json.success && json.data.token) {",
                   "  const type = json.data.user.userType;",
                   "  const key = type === 'student' ? 'studentToken' : type === 'teacher' ? 'teacherToken' : 'adminToken';",
@@ -223,7 +220,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+              "raw": "{}"
             },
             "url": {
               "raw": "{{BASE_URL}}/auth/refresh",
@@ -249,7 +246,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+              "raw": "{}"
             },
             "url": {
               "raw": "{{BASE_URL}}/auth/logout",
@@ -642,6 +639,40 @@
               "path": [
                 "subscriptions",
                 "confirm-payment"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Payment webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}"
+              },
+              {
+                "key": "x-payment-signature",
+                "value": "{{paymentWebhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacherId\": {{teacherId}},\n  \"duration\": \"ONE_MONTH\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/subscriptions/webhook",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "subscriptions",
+                "webhook"
               ]
             }
           }

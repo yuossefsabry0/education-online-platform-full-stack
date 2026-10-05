@@ -47,4 +47,14 @@ const resendLimiter = buildLimiter({
   limit: 5,
 });
 
-module.exports = { apiLimiter, authLimiter, tokenLimiter, resendLimiter, buildLimiter };
+const paymentLimiter = buildLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+});
+
+const uploadLimiter = buildLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+});
+
+module.exports = { apiLimiter, authLimiter, tokenLimiter, resendLimiter, paymentLimiter, uploadLimiter, buildLimiter };

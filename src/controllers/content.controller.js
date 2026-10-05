@@ -1,4 +1,5 @@
 const prisma = require("../db/prisma");
+const { Prisma } = require("@prisma/client");
 const { success, error } = require("../utils/apiResponse");
 const { teacherIdParam } = require("../validations/subscription.schema");
 const { contentListQuerySchema } = require("../validations/content.schema");
@@ -150,20 +151,18 @@ async function showTeacherDashboard(req, res, next) {
     });
 
     const query = parseListQuery(req.query);
-    const filtered = filterContentByTitle(content, query.q);
-    const { items, pagination } = paginateItems(filtered, query.page, query.limit);
-
     const sections = SECTION_DEFS.map(({ key, label }) => {
-      const sectionContent = items.filter(
+      const sectionContent = content.filter(
         (c) => TYPE_SECTION_MAP[c.type] === key
       );
-      return { key, label, content: sectionContent };
+      const searched = filterContentByTitle(sectionContent, query.q);
+      const paged = paginateItems(searched, query.page, query.limit);
+      return { key, label, content: paged.items, pagination: paged.pagination };
     });
 
     return success(res, {
       teacher,
       sections,
-      pagination,
       actions: {
         subscribers: `/api/teacher/dashboard/subscribers`,
         income: `/api/teacher/dashboard/income`,
@@ -188,26 +187,44 @@ async function viewSubscribers(req, res, next) {
       return error(res, "Teacher not found", 404, "TEACHER_NOT_FOUND");
     }
 
+    const statusParam = req.query.status === undefined || req.query.status === "" ? null : req.query.status;
+    if (statusParam !== null && !["ACTIVE", "EXPIRED", "CANCELLED"].includes(statusParam)) {
+      return error(res, "Invalid status filter", 400, "VALIDATION_ERROR");
+    }
+    const page = req.query.page === undefined || req.query.page === "" ? 1 : Number(req.query.page);
+    const limit = req.query.limit === undefined || req.query.limit === "" ? 10 : Number(req.query.limit);
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+      return error(res, "Invalid pagination", 400, "VALIDATION_ERROR");
+    }
+
     const now = new Date();
-    const subscriptions = await prisma.subscription.findMany({
-      where: { teacherId, ...activeSubscriptionWhere(now) },
-      orderBy: { startDate: "desc" },
-      select: {
-        id: true,
-        price: true,
-        startDate: true,
-        duration: true,
-        status: true,
-        student: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            username: true,
+    const where = statusParam === null
+      ? { teacherId, ...activeSubscriptionWhere(now) }
+      : { teacherId, status: statusParam };
+    const [total, subscriptions] = await Promise.all([
+      prisma.subscription.count({ where }),
+      prisma.subscription.findMany({
+        where,
+        orderBy: { startDate: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          price: true,
+          startDate: true,
+          duration: true,
+          status: true,
+          student: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              username: true,
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
     const subscribers = subscriptions.map((sub) => ({
       subscriptionId: sub.id,
@@ -222,8 +239,9 @@ async function viewSubscribers(req, res, next) {
 
     return success(res, {
       teacher: { id: teacher.id, name: teacher.name },
-      totalSubscribers: subscribers.length,
+      totalSubscribers: total,
       subscribers,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
     next(err);
@@ -463,41 +481,41 @@ async function getIncome(req, res, next) {
     const yearStart = new Date(now.getFullYear(), 0, 1);
     const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    const allSubscriptions = await prisma.subscription.findMany({
-      where: { teacherId, ...activeSubscriptionWhere(now) },
+    const paidSubscriptions = await prisma.subscription.findMany({
+      where: { teacherId, status: { in: ["ACTIVE", "EXPIRED"] } },
       select: {
         price: true,
         startDate: true,
       },
     });
 
-    let currentMonthIncome = 0;
-    let last3MonthsIncome = 0;
-    let yearIncome = 0;
+    let currentMonthIncome = new Prisma.Decimal(0);
+    let last3MonthsIncome = new Prisma.Decimal(0);
+    let yearIncome = new Prisma.Decimal(0);
 
-    for (const sub of allSubscriptions) {
+    for (const sub of paidSubscriptions) {
       const paymentDate = new Date(sub.startDate);
-      const price = parseFloat(sub.price.toString());
+      const price = new Prisma.Decimal(sub.price.toString());
 
       if (paymentDate >= currentMonthStart && paymentDate <= currentMonthEnd) {
-        currentMonthIncome += price;
+        currentMonthIncome = currentMonthIncome.plus(price);
       }
 
       if (paymentDate >= threeMonthsStart && paymentDate <= now) {
-        last3MonthsIncome += price;
+        last3MonthsIncome = last3MonthsIncome.plus(price);
       }
 
       if (paymentDate >= yearStart && paymentDate <= yearEnd) {
-        yearIncome += price;
+        yearIncome = yearIncome.plus(price);
       }
     }
 
     return success(res, {
       teacher: { id: teacher.id, name: teacher.name },
       income: {
-        currentMonth: Math.round(currentMonthIncome * 100) / 100,
-        last3Months: Math.round(last3MonthsIncome * 100) / 100,
-        year: Math.round(yearIncome * 100) / 100,
+        currentMonth: Number(currentMonthIncome.toString()),
+        last3Months: Number(last3MonthsIncome.toString()),
+        year: Number(yearIncome.toString()),
       },
     });
   } catch (err) {

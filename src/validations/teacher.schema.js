@@ -31,7 +31,7 @@ const sorting = {
 
 const pagination = {
   page: intParam(1, 1_000_000).default(1),
-  limit: intParam(1, 100).default(10),
+  limit: intParam(1, 50).default(10),
 };
 
 const listTeachersQuerySchema = z.object({

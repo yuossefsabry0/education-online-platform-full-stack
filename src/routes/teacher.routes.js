@@ -4,6 +4,7 @@ const { requireCoverage } = require("../middlewares/subscriptionAccess");
 const teacherController = require("../controllers/teacher.controller");
 const { success } = require("../utils/apiResponse");
 const { listPublishedIndex } = require("../services/teacherContent");
+const { deriveTeacherRole } = require("../utils/teacherRole");
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get("/", optionalAuth, teacherController.listTeachers);
 router.get(
   "/:teacherId/content",
   requireAuth,
-  requireCoverage((req) => `SUB${req.params.teacherId}`),
+  requireCoverage((req) => deriveTeacherRole(req.params.teacherId)),
   async (req, res, next) => {
     try {
       const teacherId = parseInt(req.params.teacherId, 10);
