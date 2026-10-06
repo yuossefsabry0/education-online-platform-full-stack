@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { endpoints, toApiError } from "../api/client.js";
+import TeacherImage from "../components/TeacherImage.jsx";
 import { EmptyState, ErrorBox, Loader } from "../components/ui.jsx";
 import { formatDate, formatPrice } from "../utils/format.js";
 
@@ -25,6 +26,8 @@ export default function AdminTeacherDetail() {
 
   const [editForm, setEditForm] = useState({});
   const [editTouched, setEditTouched] = useState(false);
+  const [photoForm, setPhotoForm] = useState("");
+  const [photoSaving, setPhotoSaving] = useState(false);
   const [contentForm, setContentForm] = useState({ type: "LECTURE", title: "", body: "", fileUrl: "", isPublished: true });
   const [editingContentId, setEditingContentId] = useState(null);
 
@@ -75,6 +78,23 @@ export default function AdminTeacherDetail() {
       load();
     } catch (err) {
       flashErr(err);
+    }
+  }
+
+  async function handlePhotoSave(e) {
+    e.preventDefault();
+    const photoUrl = photoForm.trim();
+    if (!photoUrl || photoSaving) return;
+    setPhotoSaving(true);
+    try {
+      await endpoints.adminEditTeacher(teacherId, { photoUrl });
+      setPhotoForm("");
+      flashOk("Teacher photo updated. The teacher has been notified.");
+      load();
+    } catch (err) {
+      flashErr(err);
+    } finally {
+      setPhotoSaving(false);
     }
   }
 
@@ -178,6 +198,28 @@ export default function AdminTeacherDetail() {
           </tbody>
         </table>
       </div>
+
+      <h2>Teacher photo</h2>
+      <form className="form-card" onSubmit={handlePhotoSave}>
+        <div className="admin-photo-row">
+          <div className="admin-photo-preview">
+            <TeacherImage teacher={{ ...teacher, photoUrl: photoForm.trim() || teacher.photoUrl }} />
+          </div>
+          <label className="field" style={{ flex: 1 }}>
+            <span>Photo URL (current: {teacher.photoUrl ? "custom photo set" : "placeholder"})</span>
+            <input
+              type="url"
+              value={photoForm}
+              placeholder={teacher.photoUrl || "https://..."}
+              onChange={(e) => setPhotoForm(e.target.value)}
+            />
+          </label>
+        </div>
+        <p className="muted small">Changing the photo updates it everywhere, is logged in the change history, and notifies the teacher.</p>
+        <button type="submit" className="btn btn-dark" disabled={photoSaving || photoForm.trim() === ""}>
+          {photoSaving ? "Saving..." : "Save photo"}
+        </button>
+      </form>
 
       <h2>Edit teacher</h2>
       <form className="form-card" onSubmit={handleEdit}>

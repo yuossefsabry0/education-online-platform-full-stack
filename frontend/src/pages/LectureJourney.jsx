@@ -37,6 +37,14 @@ function recordWatchLocally({ lectureId, title, seconds }) {
       });
     }
     localStorage.setItem(key, JSON.stringify({ ...parsed, lessons: lessons.slice(0, 500) }));
+    // Live linkage (additive): notify the profile dashboard in the same tab
+    // (the `storage` event only fires cross-tab, so an explicit event keeps
+    // every derived figure — chart, streak, badges — bound to actual data).
+    try {
+      window.dispatchEvent(new CustomEvent("edu:learning-stats-updated", { detail: { lectureId } }));
+    } catch {
+      // non-browser environments (tests) — ignore
+    }
   } catch {
     return;
   }

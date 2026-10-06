@@ -12,6 +12,7 @@ const PUBLIC_TEACHER_SELECT = {
   name: true,
   subject: true,
   gradeClass: true,
+  photoUrl: true,
 };
 
 const FULL_TEACHER_SELECT = {
@@ -21,6 +22,7 @@ const FULL_TEACHER_SELECT = {
   email: true,
   subject: true,
   gradeClass: true,
+  photoUrl: true,
   price1Month: true,
   price3Months: true,
   price6Months: true,

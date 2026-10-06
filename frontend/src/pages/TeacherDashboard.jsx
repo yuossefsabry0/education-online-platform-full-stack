@@ -22,7 +22,10 @@ const emptyExamQuestion = () => ({ text: "", options: ["", "", "", ""], correctI
 const emptyExamForm = () => ({ title: "", lessonContentId: "", timeLimitMinutes: "10", isPublished: true, questions: [emptyExamQuestion()] });
 
 export default function TeacherDashboard() {
-  const [tab, setTab] = useState("content");
+  // Dashboard tabs: Add Lecture, Exam (standalone or lecture-linked), Statistics,
+  // Subscribers, Income. The legacy "content" and "exams" panels stay rendered
+  // below for their tab values (no code deleted) but are no longer offered.
+  const [tab, setTab] = useState("add-lecture");
   const { push: pushToast } = useToast();
   const [dashboard, setDashboard] = useState(null);
   const [subscribers, setSubscribers] = useState(null);
@@ -38,6 +41,10 @@ export default function TeacherDashboard() {
   const [subPage, setSubPage] = useState(1);
   const [exams, setExams] = useState([]);
   const [examForm, setExamForm] = useState(() => emptyExamForm());
+  // Standalone exam (additive): publish an exam as its own lecture so students
+  // see it as a separate lecture with the same pass-to-unlock logic.
+  const [examStandalone, setExamStandalone] = useState(false);
+  const [examStandaloneNote, setExamStandaloneNote] = useState("");
   const [examSaving, setExamSaving] = useState(false);
   const [gradesExam, setGradesExam] = useState(null);
   const [grades, setGrades] = useState([]);
@@ -173,6 +180,12 @@ export default function TeacherDashboard() {
   async function handleExamSave(e) {
     e.preventDefault();
     setFormError(null);
+    // Standalone exam (additive): same question workflow, published as its own
+    // lecture instead of nested in a lesson. The lesson-linked path below is untouched.
+    if (examStandalone || tab === "exam") {
+      await handleStandaloneExamSave();
+      return;
+    }
     const title = examForm.title.trim();
     if (!title) {
       setFormError({ message: "Exam title is required." });
@@ -238,6 +251,87 @@ export default function TeacherDashboard() {
     }
   }
 
+  // Standalone exam (additive): identical question workflow to the lesson-linked
+  // exam above (same required fields, same messages), but published as its own
+  // lecture — a LECTURE shell carrying the exam instructions plus an exam linked
+  // to that shell. Students see it as a separate lecture with the same
+  // pass-to-unlock sequential logic. Uses the existing validated endpoints, so
+  // backend validation, ownership and logging stay exactly as before.
+  async function handleStandaloneExamSave() {
+    const title = examForm.title.trim();
+    if (!title) {
+      setFormError({ message: "Exam title is required." });
+      return;
+    }
+    const minutes = Number(examForm.timeLimitMinutes);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 120) {
+      setFormError({ message: "Time limit must be between 1 and 120 minutes." });
+      return;
+    }
+    const cleaned = [];
+    for (const q of examForm.questions) {
+      const entered = q.options.map((o) => o.trim());
+      const correctText = entered[q.correctIndex];
+      if (!q.text.trim()) {
+        setFormError({ message: "Each question needs text." });
+        return;
+      }
+      if (entered.some((o) => o === "")) {
+        setFormError({ message: "All 4 options are required for each question — please fill every option." });
+        return;
+      }
+      if (!correctText) {
+        setFormError({ message: "Each question's marked correct answer must have option text." });
+        return;
+      }
+      const options = entered.filter((o) => o !== "");
+      if (options.length < 2) {
+        setFormError({ message: "Each question needs at least 2 non-empty options." });
+        return;
+      }
+      cleaned.push({ text: q.text.trim(), options, correctIndex: options.indexOf(correctText) });
+    }
+    if (cleaned.length === 0) {
+      setFormError({ message: "An exam needs at least 1 question." });
+      return;
+    }
+    setExamSaving(true);
+    try {
+      const note = examStandaloneNote.trim() || "Standalone exam — pass with 50% or more to unlock the next lecture.";
+      const shell = await endpoints.teacherAddContent({
+        type: "LECTURE",
+        title,
+        body: `[standalone-exam]\n${note}`,
+        isPublished: examForm.isPublished,
+      });
+      const shellId = shell && shell.content ? shell.content.id : null;
+      if (!shellId) {
+        setFormError({ message: "The standalone lecture could not be created. Please try again." });
+        return;
+      }
+      const created = await endpoints.teacherAddExam({
+        title,
+        lessonContentId: Number(shellId),
+        timeLimitSeconds: Math.round(minutes * 60),
+        isPublished: examForm.isPublished,
+        questions: cleaned,
+      });
+      setExamForm(emptyExamForm());
+      setExamStandaloneNote("");
+      const dash = await endpoints.teacherDashboard({ limit: 50, page: dashPage });
+      setDashboard(dash);
+      await reloadExams();
+      pushToast(
+        `Standalone exam "${created && created.exam ? created.exam.title : title}" published as its own lecture with ${cleaned.length} ${cleaned.length === 1 ? "question" : "questions"}.`,
+        "success"
+      );
+    } catch (err) {
+      setFormError(toApiError(err));
+    } finally {
+      setExamSaving(false);
+    }
+  }
+
   async function handleExamDelete(examId) {
     if (!window.confirm("Delete this exam and all its grades?")) return;
     try {
@@ -292,6 +386,10 @@ export default function TeacherDashboard() {
     return new Date(c.createdAt).getFullYear() === now.getFullYear();
   }).length;
   const studentsViewing = subscribers.totalSubscribers ?? subs.length;
+  // Exam tab is standalone-only (additive): the exam is a separate entity, so
+  // the new Exam tab never offers a lecture picker. The legacy lesson-linked
+  // workflow below stays intact for the legacy "exams" tab value.
+  const examTabStandalone = tab === "exam" ? true : examStandalone;
 
   return (
     <div className="page">
@@ -320,7 +418,7 @@ export default function TeacherDashboard() {
       ) : null}
 
       <div className="tabs" role="tablist" aria-label="Teacher dashboard sections">
-        {[["add-lecture", "Add Lecture"], ["content", "Content"], ["exams", "Exams"], ["statistics", "Statistics"], ["subscribers", "Subscribers"], ["income", "Income"]].map(([t, label]) => (
+        {[["add-lecture", "Add Lecture"], ["exam", "Exam"], ["statistics", "Statistics"], ["subscribers", "Subscribers"], ["income", "Income"]].map(([t, label]) => (
           <button
             key={t}
             type="button"
@@ -337,6 +435,7 @@ export default function TeacherDashboard() {
       </div>
 
       {tab === "add-lecture" && (
+        <>
         <UnifiedLectureWizard
           onCreated={async () => {
             try {
@@ -351,6 +450,87 @@ export default function TeacherDashboard() {
             }
           }}
         />
+        {/* Previously added lectures (additive): the teacher's own uploads at
+            the bottom of the Add Lecture section with inline Edit (layered
+            editor) and Delete. Reuses the existing layers editor, edit state
+            and delete handler — no workflow changes. */}
+        <h2 style={{ marginTop: "2rem" }}>Previously added lectures ({lectures.length})</h2>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Everything you have uploaded so far — edit any layer of a lecture or delete it. Changes appear to subscribed students immediately.
+        </p>
+        {lectures.length === 0 ? (
+          <EmptyState title="No lectures yet" hint="Use the wizard above to add your first lecture — it will appear here for editing." />
+        ) : (
+          <div className="content-list">
+            {lectures.map((lecture, i) => {
+              const lectureExams = exams.filter((e) => e && Number(e.lessonContentId) === Number(lecture.id));
+              const standalone = typeof lecture.body === "string" && lecture.body.startsWith("[standalone-exam]");
+              return (
+                <article key={lecture.id} className={`content-item${standalone ? " journey-card--exam" : ""}`}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.4rem" }}>
+                    <span className="role-badge" aria-hidden="true">{i + 1}</span>
+                    {standalone ? (
+                      <span className="exam-badge" title="Standalone exam">Exam</span>
+                    ) : null}
+                    <span className="muted small">
+                      Lecture {i + 1} of {lectures.length}
+                      {lectureExams.length > 0 ? ` · Exam: ${lectureExams[0].title}` : " · No exam yet"}
+                    </span>
+                    <span className="muted small" style={{ marginLeft: "auto" }}>
+                      {lecture.isPublished !== false ? "Published" : "Hidden"}
+                    </span>
+                  </div>
+                  <h3 style={{ marginTop: 0 }}>{lecture.title}</h3>
+                  <div className="btn-row">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      title="Edit every layer of this lecture (details, files, video, exam)"
+                      onClick={() => {
+                        setLayersEditId(lecture.id);
+                        requestAnimationFrame(() => {
+                          document.getElementById("lecture-layers-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        });
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDelete(lecture.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {(() => {
+          if (layersEditId == null) return null;
+          const lecture = allContent.find((c) => c && c.id === layersEditId && c.type === "LECTURE");
+          if (!lecture) return null;
+          return (
+            <LectureLayersEditor
+              key={lecture.id}
+              lecture={lecture}
+              allContent={allContent}
+              exams={exams}
+              onClose={() => setLayersEditId(null)}
+              onSaved={async () => {
+                try {
+                  const [dash, ex] = await Promise.all([
+                    endpoints.teacherDashboard({ limit: 50, page: dashPage }),
+                    endpoints.teacherExams().catch(() => ({ exams: [] })),
+                  ]);
+                  setDashboard(dash);
+                  setExams(ex.exams || []);
+                } catch {
+                  return;
+                }
+              }}
+            />
+          );
+        })()}
+        </>
       )}
 
       {tab === "content" && (
@@ -537,13 +717,39 @@ export default function TeacherDashboard() {
         </>
       )}
 
-      {tab === "exams" && (
+      {(tab === "exam" || tab === "exams") && (
         <>
           <h2>Create exam</h2>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Exams appear in the assignment section for subscribed students. Set questions with
-            multiple-choice options, mark the correct answer, and choose a time limit and lesson.
+            Exams use the same question workflow as lecture homework: set questions with
+            multiple-choice options, mark the correct answer, and choose a time limit.
+            Every exam is published as a standalone exam that appears
+            to students as its own lecture.
           </p>
+          {tab === "exam" ? (
+            <p className="standalone-banner" role="note">
+              <strong>Standalone exam</strong>
+              <span>Published independently — students see it as a separate lecture and must pass it to unlock what follows.</span>
+            </p>
+          ) : (
+          <button
+            type="button"
+            className={examStandalone ? "standalone-toggle standalone-toggle--on" : "standalone-toggle"}
+            onClick={() => setExamStandalone((v) => !v)}
+            aria-pressed={examStandalone}
+            title="Toggle standalone exam mode"
+          >
+            <span className="standalone-toggle-switch" aria-hidden="true" />
+            <span className="standalone-toggle-text">
+              <strong>Standalone exam {examStandalone ? "· ON" : "· OFF"}</strong>
+              <span className="muted small">
+                {examStandalone
+                  ? "Published independently — students see it as a separate lecture and must pass it to unlock what follows."
+                  : "Turn on to publish this exam independently instead of nesting it in a lecture."}
+              </span>
+            </span>
+          </button>
+          )}
           {formError ? <ErrorBox error={formError} /> : null}
           <form className="form-card" onSubmit={handleExamSave}>
             <div className="form-row">
@@ -551,16 +757,24 @@ export default function TeacherDashboard() {
                 <span>Exam title</span>
                 <input type="text" value={examForm.title} onChange={(e) => setExamForm({ ...examForm, title: e.target.value })} required />
               </label>
+              {examTabStandalone ? null : (
               <label className="field">
-                <span>Lesson (required)</span>
-                <select value={examForm.lessonContentId} onChange={(e) => setExamForm({ ...examForm, lessonContentId: e.target.value })} required>
+                <span>Lesson (required{examStandalone ? " — skipped for standalone exams" : ""})</span>
+                <select value={examForm.lessonContentId} onChange={(e) => setExamForm({ ...examForm, lessonContentId: e.target.value })} required={!examStandalone} disabled={examStandalone}>
                   <option value="">Select a lesson…</option>
                   {lectures.map((l) => (
                     <option key={l.id} value={l.id}>{l.title} (ID {l.id})</option>
                   ))}
                 </select>
               </label>
+              )}
             </div>
+            {examTabStandalone ? (
+              <label className="field">
+                <span>Exam instructions (shown on the standalone lecture)</span>
+                <textarea value={examStandaloneNote} onChange={(e) => setExamStandaloneNote(e.target.value)} rows={3} placeholder="e.g. Read each question carefully — you need 50% to unlock the next lecture." />
+              </label>
+            ) : null}
             <div className="form-row">
               <label className="field">
                 <span>Time limit (minutes)</span>
@@ -620,7 +834,7 @@ export default function TeacherDashboard() {
                 Add question
               </button>
               <button type="submit" className="btn btn-dark btn-sm" disabled={examSaving}>
-                {examSaving ? "Saving..." : "Create exam"}
+                {examSaving ? "Saving..." : examTabStandalone ? "Publish standalone exam" : "Create exam"}
               </button>
             </div>
           </form>

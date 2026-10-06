@@ -25,7 +25,7 @@ describe("TeacherImage", () => {
   it("keeps the remote primary and degrades to the teacher initial", () => {
     render(<TeacherImage teacher={{ id: 3, name: "Carlos" }} />);
     const img = screen.getByRole("img", { name: /carlos/i });
-    expect(img).toHaveAttribute("src", "https://picsum.photos/seed/teacher-3/640/420");
+    expect(img).toHaveAttribute("src", "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=640&q=70");
     fireEvent.error(img);
     expect(screen.getByText("C")).toBeInTheDocument();
   });

@@ -202,7 +202,7 @@ export default function UnifiedLectureWizard({ onCreated }) {
         } catch (filesErr) {
           const apiErr = toApiError(filesErr);
           pushToast(
-            `Lecture "${form.lectureTitle.trim()}" added, but the files layer failed: ${apiErr.message}. Add it later from the Content tab.`,
+            `Lecture "${form.lectureTitle.trim()}" added, but the files layer failed: ${apiErr.message}. You can add the files layer later.`,
             "error"
           );
         }
@@ -231,7 +231,7 @@ export default function UnifiedLectureWizard({ onCreated }) {
           // matching the existing separate-flow behaviour).
           const apiErr = toApiError(examErr);
           pushToast(
-            `Lecture "${form.lectureTitle.trim()}" added, but the exam layer failed: ${apiErr.message}. Open the Exams tab to retry.`,
+            `Lecture "${form.lectureTitle.trim()}" added, but the exam layer failed: ${apiErr.message}. Open the Exam tab to retry.`,
             "error"
           );
           setStepError(apiErr);

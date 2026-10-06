@@ -75,7 +75,7 @@ export default function App() {
             <Route
               path="/content/teacher/:teacherId"
               element={
-                <ProtectedRoute allow={["student"]}>
+                <ProtectedRoute allow={["student", "admin"]}>
                   <TeacherContent />
                 </ProtectedRoute>
               }
@@ -83,7 +83,7 @@ export default function App() {
             <Route
               path="/content/teacher/:teacherId/lectures/:lectureId"
               element={
-                <ProtectedRoute allow={["student"]}>
+                <ProtectedRoute allow={["student", "admin"]}>
                   <LectureJourney />
                 </ProtectedRoute>
               }
@@ -91,7 +91,7 @@ export default function App() {
             <Route
               path="/content/teacher/:teacherId/lectures/:lectureId/files"
               element={
-                <ProtectedRoute allow={["student"]}>
+                <ProtectedRoute allow={["student", "admin"]}>
                   <LectureJourney />
                 </ProtectedRoute>
               }
@@ -99,7 +99,7 @@ export default function App() {
             <Route
               path="/content/teacher/:teacherId/lectures/:lectureId/video"
               element={
-                <ProtectedRoute allow={["student"]}>
+                <ProtectedRoute allow={["student", "admin"]}>
                   <LectureJourney />
                 </ProtectedRoute>
               }

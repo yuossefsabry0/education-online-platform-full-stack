@@ -206,6 +206,7 @@ const TEACHER_FULL_SELECT = {
   email: true,
   subject: true,
   gradeClass: true,
+  photoUrl: true,
   price1Month: true,
   price3Months: true,
   price6Months: true,
@@ -320,6 +321,24 @@ async function editTeacher(req, res, next) {
         },
       },
     });
+
+    // Dedicated photo-change record so the teacher's notification feed and
+    // the change history show exactly when the admin changed the photo.
+    if (rest.photoUrl !== undefined) {
+      await prisma.logHistory.create({
+        data: {
+          actionType: "TEACHER_PHOTO_UPDATED",
+          actorId: String(req.user.id),
+          actorType: "ADMIN",
+          targetId: String(teacherId),
+          details: {
+            teacherId,
+            photoUrl: updated.photoUrl || null,
+            changedAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
 
     return success(res, { teacher: updated });
   } catch (err) {
@@ -718,6 +737,38 @@ async function cancelSubscription(req, res, next) {
   }
 }
 
+async function broadcastNotification(req, res, next) {
+  try {
+    const { title, message } = req.body;
+    const created = await prisma.logHistory.create({
+      data: {
+        actionType: "ANNOUNCEMENT",
+        actorId: String(req.user.id),
+        actorType: "ADMIN",
+        targetId: "all",
+        details: {
+          title: title.trim(),
+          message: message.trim(),
+        },
+      },
+    });
+    return success(
+      res,
+      {
+        notification: {
+          id: created.id,
+          title: created.details.title,
+          message: created.details.message,
+          timestamp: created.timestamp,
+        },
+      },
+      201
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listSubscribers,
   listTeacherSubscribers,
@@ -731,4 +782,5 @@ module.exports = {
   deleteContent,
   getLogHistory,
   cancelSubscription,
+  broadcastNotification,
 };

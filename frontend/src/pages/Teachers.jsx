@@ -1,22 +1,65 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { endpoints, toApiError } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import TeacherImage from "../components/TeacherImage.jsx";
 import { EmptyState, ErrorBox, Loader, Pagination } from "../components/ui.jsx";
+import { formatPrice } from "../utils/format.js";
+
+// Admin inline snapshot (additive): full teacher details on the teachers
+// route — lecture/student counts, prices, and unrestricted content access.
+function AdminTeacherSnapshot({ teacher, snapshot, onGoToContent, onManage }) {
+  if (!snapshot || snapshot.loading) {
+    return <p className="muted small" style={{ marginTop: "0.75rem" }}>Loading teacher details...</p>;
+  }
+  if (snapshot.error) {
+    return <p className="muted small" role="alert" style={{ marginTop: "0.75rem" }}>Could not load details: {snapshot.error.message}</p>;
+  }
+  const detailTeacher = (snapshot.detail && snapshot.detail.teacher) || teacher;
+  const contents = detailTeacher.contents || [];
+  const lectureCount = contents.filter((c) => c.type === "LECTURE").length;
+  return (
+    <div className="admin-teacher-snapshot">
+      <div className="admin-snapshot-row">
+        <span className="muted small">Lectures</span>
+        <strong>{lectureCount}</strong>
+      </div>
+      <div className="admin-snapshot-row">
+        <span className="muted small">Students</span>
+        <strong>{snapshot.studentCount ?? "—"}</strong>
+      </div>
+      <div className="admin-snapshot-row">
+        <span className="muted small">Prices (1m / 3m / 6m / 1y)</span>
+        <strong>{[detailTeacher.price1Month, detailTeacher.price3Months, detailTeacher.price6Months, detailTeacher.price1Year].map(formatPrice).join(" / ")}</strong>
+      </div>
+      <div className="btn-row">
+        <button type="button" className="btn btn-dark btn-sm" onClick={onGoToContent}>
+          Go to Content
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onManage}>
+          Manage
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // GET /api/teachers/search?q=... (when searching) or GET /api/teachers (browsing).
 // Public response fields: id, name, subject, gradeClass (+ pagination).
 export default function Teachers() {
   const navigate = useNavigate();
   const { userType } = useAuth();
-  const [query, setQuery] = useState("");
-  const [appliedQuery, setAppliedQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState(() => (searchParams.get("q") || "").trim());
+  const [appliedQuery, setAppliedQuery] = useState(() => (searchParams.get("q") || "").trim());
   const [page, setPage] = useState(1);
   const [teachers, setTeachers] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Admin inline "View" snapshot (additive): full details per teacher on demand.
+  const [viewId, setViewId] = useState(null);
+  const [viewCache, setViewCache] = useState({});
 
   const fetchTeachers = useCallback(
     async (q, p) => {
@@ -38,6 +81,13 @@ export default function Teachers() {
     },
     []
   );
+
+  useEffect(() => {
+    const q = (searchParams.get("q") || "").trim();
+    setQuery(q);
+    setAppliedQuery(q);
+    setPage(1);
+  }, [searchParams]);
 
   useEffect(() => {
     if (userType === "teacher") {
@@ -73,6 +123,35 @@ export default function Teachers() {
     e.preventDefault();
     setPage(1);
     setAppliedQuery(query.trim());
+  }
+
+  async function toggleAdminView(teacher) {
+    if (viewId === teacher.id) {
+      setViewId(null);
+      return;
+    }
+    setViewId(teacher.id);
+    if (viewCache[teacher.id]) return;
+    setViewCache((c) => ({ ...c, [teacher.id]: { loading: true, error: null, detail: null, studentCount: null } }));
+    try {
+      const [d, s] = await Promise.all([
+        endpoints.adminTeacherDetail(teacher.id),
+        endpoints.adminTeacherSubscribers(teacher.id, { page: 1, limit: 1 }),
+      ]);
+      setViewCache((c) => ({
+        ...c,
+        [teacher.id]: {
+          loading: false,
+          error: null,
+          detail: d,
+          studentCount: s && typeof s.totalSubscribers === "number"
+            ? s.totalSubscribers
+            : ((d && d.teacher && d.teacher.subscriptions) || []).length,
+        },
+      }));
+    } catch (err) {
+      setViewCache((c) => ({ ...c, [teacher.id]: { loading: false, error: toApiError(err), detail: null, studentCount: null } }));
+    }
   }
 
   return (
@@ -158,8 +237,25 @@ export default function Teachers() {
                       >
                         View content
                       </button>
+                    ) : userType === "admin" ? (
+                      <button
+                        type="button"
+                        className="btn btn-dark btn-sm"
+                        onClick={() => toggleAdminView(teacher)}
+                        aria-expanded={viewId === teacher.id}
+                      >
+                        {viewId === teacher.id ? "Hide" : "View"}
+                      </button>
                     ) : null}
                   </div>
+                  {userType === "admin" && viewId === teacher.id ? (
+                    <AdminTeacherSnapshot
+                      teacher={teacher}
+                      snapshot={viewCache[teacher.id]}
+                      onGoToContent={() => navigate(`/content/teacher/${teacher.id}`)}
+                      onManage={() => navigate(`/admin/teachers/${teacher.id}`)}
+                    />
+                  ) : null}
                 </div>
               </article>
             ))}

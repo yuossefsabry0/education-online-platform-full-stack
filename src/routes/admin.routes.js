@@ -5,6 +5,7 @@ const adminController = require("../controllers/admin.controller");
 const {
   addTeacherSchema,
   editTeacherSchema,
+  announcementSchema,
 } = require("../validations/admin.schema");
 const {
   addContentSchema,
@@ -70,6 +71,13 @@ router.delete("/teachers/:teacherId", adminController.deleteTeacher);
 
 // Log History (chronological, pagination + sorting)
 router.get("/logs", adminController.getLogHistory);
+
+// Broadcast a notification to every account on the platform.
+router.post(
+  "/notifications",
+  validate(announcementSchema),
+  adminController.broadcastNotification
+);
 
 // Cancel a user's active subscription with a teacher
 router.post(

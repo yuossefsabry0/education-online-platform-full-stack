@@ -5,18 +5,19 @@ import { useAuth } from "../auth/AuthContext.jsx";
 import SafeImg from "../components/SafeImg.jsx";
 
 const HERO_IMG =
-  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=70";
+  "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1400&q=70";
 const STUDY_IMG =
-  "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=900&q=70";
+  "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=900&q=70";
 const CLASS_IMG =
-  "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=70";
+  "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=900&q=70";
 const ONLINE_IMG =
-  "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?auto=format&fit=crop&w=900&q=70";
+  "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=900&q=70";
 
 export default function Home() {
   const navigate = useNavigate();
   const { isAuthenticated, userType } = useAuth();
   const [contact, setContact] = useState(null);
+  const [homeQuery, setHomeQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +39,12 @@ export default function Home() {
     document.getElementById("subscription-plans")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function handleHeroSearch(e) {
+    e.preventDefault();
+    const q = homeQuery.trim();
+    navigate(q ? `/teachers?q=${encodeURIComponent(q)}` : "/teachers");
+  }
+
   return (
     <div className="page">
       <section className="hero">
@@ -48,6 +55,27 @@ export default function Home() {
             Browse qualified teachers, subscribe to their courses, and unlock lectures,
             lesson content, and homework — all in one place.
           </p>
+          <form className="hero-search" onSubmit={handleHeroSearch} role="search">
+            <span className="hero-search-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" x2="16.65" y1="21" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              placeholder="Search for courses, teachers or topics..."
+              value={homeQuery}
+              onChange={(e) => setHomeQuery(e.target.value)}
+              aria-label="Search courses, teachers or topics"
+            />
+            <button type="submit" className="hero-search-btn" aria-label="Search" title="Search">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" x2="16.65" y1="21" y2="16.65" />
+              </svg>
+            </button>
+          </form>
           <div className="btn-row">
             <button type="button" className="btn btn-dark" onClick={() => navigate("/teachers")}>
               Find a teacher
@@ -72,7 +100,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-media img-zoom">
-          <SafeImg className="zoom-img" src={HERO_IMG} alt="Placeholder students learning together on campus" label="Education System" eager />
+          <SafeImg className="zoom-img" src={HERO_IMG} alt="Graduates celebrating together on campus" label="Education System" eager />
         </div>
       </section>
 
@@ -81,7 +109,7 @@ export default function Home() {
         <div className="cards-3">
           <div className="card img-zoom">
             <div className="card-media">
-              <SafeImg className="zoom-img" src={STUDY_IMG} alt="Placeholder student taking notes while studying" label="Discover teachers" />
+              <SafeImg className="zoom-img" src={STUDY_IMG} alt="Student taking notes while studying" label="Discover teachers" />
             </div>
             <h3>1. Discover teachers</h3>
             <p className="muted">Search verified teachers by name, subject, and grade.</p>
@@ -91,7 +119,7 @@ export default function Home() {
           </div>
           <div className="card img-zoom">
             <div className="card-media">
-              <SafeImg className="zoom-img" src={CLASS_IMG} alt="Placeholder teacher leading a classroom lesson" label="Subscribe" />
+              <SafeImg className="zoom-img" src={CLASS_IMG} alt="Teacher leading a classroom lesson" label="Subscribe" />
             </div>
             <h3>2. Subscribe</h3>
             <p className="muted">Pick a plan — 1, 3, 6, or 12 months — and confirm payment.</p>
@@ -112,7 +140,7 @@ export default function Home() {
           </div>
           <div className="card img-zoom">
             <div className="card-media">
-              <SafeImg className="zoom-img" src={ONLINE_IMG} alt="Placeholder student learning online with a laptop" label="Learn" />
+              <SafeImg className="zoom-img" src={ONLINE_IMG} alt="Student learning online with a laptop" label="Learn" />
             </div>
             <h3>3. Learn</h3>
             <p className="muted">Unlock lectures, lesson content, and homework for your teachers.</p>

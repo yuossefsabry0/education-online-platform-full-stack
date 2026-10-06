@@ -188,10 +188,17 @@ describe("content pagination and search", () => {
   it("keeps authorization on paged routes", async () => {
     const anon = await request(app).get(`/api/content/teacher/${S.teacherId}/lectures`);
     expectErrorShape(anon, 401, "UNAUTHORIZED");
+    const teacher = await request(app)
+      .get(`/api/content/teacher/${S.teacherId}/lectures`)
+      .set("Authorization", `Bearer ${S.teacherToken}`);
+    expectErrorShape(teacher, 403, "FORBIDDEN");
+    // Admins may view any teacher's content without holding a subscription.
     const admin = await request(app)
       .get(`/api/content/teacher/${S.teacherId}/lectures`)
-      .set("Authorization", `Bearer ${S.adminToken}`);
-    expectErrorShape(admin, 403, "FORBIDDEN");
+      .set("Authorization", `Bearer ${S.adminToken}`)
+      .expect(200);
+    expectSuccessShape(admin);
+    expect(Array.isArray(admin.body.data.section.content)).toBe(true);
   });
 
   it("paginates the teacher dashboard list per section", async () => {

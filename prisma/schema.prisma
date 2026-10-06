@@ -74,6 +74,8 @@ model Teacher {
   password     String
   subject      String
   gradeClass   String
+  // Optional teacher photo (URL) editable by admins; shown to everyone.
+  photoUrl     String?         @db.VarChar(500)
   // 4 subscription duration prices (stored as data, easy to change per teacher)
   price1Month  Decimal            @db.Decimal(10, 2)
   price3Months Decimal            @db.Decimal(10, 2)

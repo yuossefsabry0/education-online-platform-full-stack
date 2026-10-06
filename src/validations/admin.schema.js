@@ -159,6 +159,15 @@ const editTeacherSchema = z
       .min(1, "Grade cannot be empty")
       .max(100, "Grade must be at most 100 characters")
       .optional(),
+    photoUrl: z
+      .string()
+      .trim()
+      .min(1, "Photo URL cannot be empty")
+      .max(500, "Photo URL must be at most 500 characters")
+      .refine((v) => /^https?:\/\//i.test(v), {
+        message: "Photo URL must start with http:// or https://",
+      })
+      .optional(),
     price1Month: z
       .number()
       .nonnegative("price1Month must be a non-negative number")
@@ -180,6 +189,19 @@ const editTeacherSchema = z
     message: "At least one field must be provided",
   });
 
+const announcementSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(100, "Title must be at most 100 characters"),
+  message: z
+    .string()
+    .trim()
+    .min(1, "Message is required")
+    .max(500, "Message must be at most 500 characters"),
+});
+
 module.exports = {
   idParam,
   subscribersQuerySchema,
@@ -187,4 +209,5 @@ module.exports = {
   logsQuerySchema,
   addTeacherSchema,
   editTeacherSchema,
+  announcementSchema,
 };

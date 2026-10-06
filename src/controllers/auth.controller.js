@@ -205,6 +205,22 @@ async function login(req, res) {
   const refreshToken = await createRefreshTokenFor(userType, user.id);
   setRefreshCookie(res, refreshToken);
 
+  // Record the sign-in so the notification feed can surface "at login"
+  // events. Never allowed to break login itself.
+  try {
+    await prisma.logHistory.create({
+      data: {
+        actionType: "LOGIN_SUCCESS",
+        actorId: String(user.id),
+        actorType: OWNER_TYPE_MAP[userType] || "STUDENT",
+        targetId: String(user.id),
+        details: { userType, username: user.username },
+      },
+    });
+  } catch {
+    /* login succeeds even if the audit write fails */
+  }
+
   return success(res, {
     token,
     tokenType: "Bearer",

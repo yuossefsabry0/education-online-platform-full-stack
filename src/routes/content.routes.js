@@ -1,6 +1,6 @@
 const { Router } = require("express");
 const { requireAuth } = require("../middlewares/auth");
-const { requireCoverage } = require("../middlewares/subscriptionAccess");
+const { requireCoverage, requireCoverageOrAdmin } = require("../middlewares/subscriptionAccess");
 const validate = require("../middlewares/validate");
 const { submitExamSchema } = require("../validations/exam.schema");
 const contentController = require("../controllers/content.controller");
@@ -14,12 +14,18 @@ const requireTeacherSubscription = requireCoverage(
   (req) => deriveTeacherRole(req.params.teacherId)
 );
 
+// Same gate, but admins may view without holding a subscription.
+const requireTeacherSubscriptionOrAdmin = requireCoverageOrAdmin(
+  (req) => deriveTeacherRole(req.params.teacherId)
+);
+
 // Protected content page for a teacher: visible only to holders of the
-// teacher's active subscription role (SUB{teacherId}).
+// teacher's active subscription role (SUB{teacherId}); admins may view any
+// teacher's content without a subscription.
 router.get(
   "/teacher/:teacherId",
   requireAuth,
-  requireTeacherSubscription,
+  requireTeacherSubscriptionOrAdmin,
   contentController.showContentPage
 );
 
@@ -30,14 +36,14 @@ router.get(
 router.get(
   "/teacher/:teacherId/exams",
   requireAuth,
-  requireTeacherSubscription,
+  requireTeacherSubscriptionOrAdmin,
   examController.listStudentExams
 );
 
 router.get(
   "/teacher/:teacherId/exams/:examId",
   requireAuth,
-  requireTeacherSubscription,
+  requireTeacherSubscriptionOrAdmin,
   examController.getStudentExam
 );
 
@@ -55,7 +61,7 @@ router.post(
 router.get(
   "/teacher/:teacherId/lectures/:lectureId/journey",
   requireAuth,
-  requireTeacherSubscription,
+  requireTeacherSubscriptionOrAdmin,
   lectureJourneyController.getLectureJourney
 );
 
@@ -67,11 +73,11 @@ router.post(
 );
 
 // Lectures / Lesson Content / Homework routes for one teacher, gated by the
-// same active subscription role as the content page above.
+// same active subscription role as the content page above (admins exempt).
 router.get(
   "/teacher/:teacherId/:section",
   requireAuth,
-  requireTeacherSubscription,
+  requireTeacherSubscriptionOrAdmin,
   contentController.showSection
 );
 

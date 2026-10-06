@@ -7,6 +7,7 @@ const TEACHER_INFO_SELECT = {
   name: true,
   subject: true,
   gradeClass: true,
+  photoUrl: true,
 };
 
 const SECTION_DEFS = [

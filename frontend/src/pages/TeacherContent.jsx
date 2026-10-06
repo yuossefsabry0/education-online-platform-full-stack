@@ -9,6 +9,25 @@ import { EmptyState, ErrorBox, Loader, Pagination } from "../components/ui.jsx";
 // Requires an ACTIVE subscription (role SUB{teacherId}); otherwise 403.
 const SECTION_KEYS = ["lectures", "lesson-content", "homework"];
 
+// Standalone exams (additive): the instructor can publish an exam as its own
+// lecture (a LECTURE shell whose body starts with this marker + a linked exam).
+// Students see it inline in the single Lectures list with an Exam badge and the
+// same sequential-lock logic as every other lecture — no separate section.
+const STANDALONE_EXAM_MARKER = "[standalone-exam]";
+
+function isStandaloneExam(item) {
+  return (
+    item &&
+    typeof item.body === "string" &&
+    item.body.startsWith(STANDALONE_EXAM_MARKER)
+  );
+}
+
+function standaloneExamInstructions(item) {
+  if (!isStandaloneExam(item)) return "";
+  return item.body.slice(STANDALONE_EXAM_MARKER.length).replace(/^\s+/, "");
+}
+
 export default function TeacherContent() {
   const { teacherId } = useParams();
   const navigate = useNavigate();
@@ -179,7 +198,7 @@ export default function TeacherContent() {
           <div className="empty-state">
             <h3>Subscription required to view this content</h3>
             <p className="muted">
-              This teacher&apos;s lectures, lesson content, and homework are available to students
+              This teacher&apos;s lectures and exams are available to students
               with an active subscription. Subscribe to unlock the full course content.
             </p>
             <p className="muted small">Choose a 1, 3, 6, or 12-month plan, confirm payment, then return here to continue learning.</p>
@@ -209,8 +228,13 @@ export default function TeacherContent() {
     page && Array.isArray(page.sections) && page.sections.length
       ? page.sections.map((s) => s.key)
       : SECTION_KEYS;
+  // Consolidated student view (additive): lectures, lesson content and homework
+  // are layers of a single lecture, so students browse one unified Lectures list.
+  // Standalone exams are published as their own lecture and appear inline here.
+  // Other section fetch flows stay in code for backend compatibility.
+  const visibleSectionKeys = sectionKeys.includes("lectures") ? ["lectures"] : sectionKeys;
   const SECTION_HINTS = {
-    lectures: "Watch and review each lecture in order. Open any attachments for slides or notes.",
+    lectures: "Watch and review each lecture in order. Open any attachments for slides or notes. Standalone exams appear here as their own lecture.",
     "lesson-content": "Study notes, explanations, and reading material prepared by your teacher.",
     homework: "Practice assignments for this teacher. Complete each task and check the attachments.",
   };
@@ -254,7 +278,7 @@ export default function TeacherContent() {
           <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
             {teacher ? `${teacher.subject} · ${teacher.gradeClass}` : "Published course material"}
             {" · "}
-            {sectionKeys.length} sections
+            {visibleSectionKeys.length} {visibleSectionKeys.length === 1 ? "section" : "sections"}
             {sectionData && sectionData.label ? ` · Now viewing: ${sectionData.label}` : ` · Now viewing: ${activeLabel}`}
           </p>
         </div>
@@ -262,7 +286,7 @@ export default function TeacherContent() {
       </div>
 
       <div className="tabs" role="tablist" aria-label="Content sections">
-        {sectionKeys.map((key) => {
+        {visibleSectionKeys.map((key) => {
           const label = key === "lesson-content" ? "Lesson Content" : key.charAt(0).toUpperCase() + key.slice(1);
           const isActive = sectionKey === key;
           return (
@@ -394,6 +418,9 @@ export default function TeacherContent() {
             // Files/video unlock inside the journey after passing the exam.
             if (sectionKey === "lectures") {
               const linked = journeyExams.filter((e) => e.lessonContentId === item.id);
+              const standalone = isStandaloneExam(item);
+              const examNote = standalone ? standaloneExamInstructions(item) : "";
+              const standaloneExam = standalone && linked.length === 1 ? linked[0] : null;
               const best = linked.length
                 ? Math.max(...linked.map((e) => (typeof e.lastPercent === "number" ? e.lastPercent : -1)))
                 : null;
@@ -420,7 +447,7 @@ export default function TeacherContent() {
                   ? `Lecture ${index + 1} is locked — watch and complete Lecture ${blockingIndex + 1} first (pass its exam with ≥ 50%) to unlock it.`
                   : `Lecture ${index + 1} is locked — watch and complete the previous lectures first to unlock it.`;
               return (
-                <article key={item.id} className={`content-item journey-card${lockedByPrev ? " journey-locked-card" : ""}`}>
+                <article key={item.id} className={`content-item journey-card${lockedByPrev ? " journey-locked-card" : ""}${standalone ? " journey-card--exam" : ""}`}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.4rem" }}>
                     <span className="role-badge" aria-hidden="true">
                       {lockedByPrev ? (
@@ -432,17 +459,30 @@ export default function TeacherContent() {
                         index + 1
                       )}
                     </span>
+                    {standalone ? (
+                      <span className="exam-badge" title="Standalone exam — pass it to unlock what follows">Exam</span>
+                    ) : null}
                     <span className="muted small">
-                      Lecture {index + 1} of {items.length} · Tier {lockedByPrev ? "locked" : passed ? "unlocked ✓" : "1 of 4"}
+                      {standalone ? `Exam ${index + 1} of ${items.length}` : `Lecture ${index + 1} of ${items.length}`} · Tier {lockedByPrev ? "locked" : passed ? "unlocked ✓" : "1 of 4"}
                     </span>
                     <span className="muted small" style={{ marginLeft: "auto" }}>
                       Published {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "recently"}
                     </span>
                   </div>
                   <h3 style={{ marginTop: 0 }}>{item.title}</h3>
-                  {item.body ? <p style={{ whiteSpace: "pre-wrap" }}>{item.body}</p> : null}
+                  {standalone ? (
+                    examNote ? <p style={{ whiteSpace: "pre-wrap" }}>{examNote}</p> : null
+                  ) : (
+                    item.body ? <p style={{ whiteSpace: "pre-wrap" }}>{item.body}</p> : null
+                  )}
                   <p className="muted small" style={{ marginBottom: 0 }}>
-                    {linked.length === 0
+                    {standalone && standaloneExam
+                      ? `${standaloneExam.questionCount ?? "?"} ${(standaloneExam.questionCount === 1) ? "question" : "questions"} · ${Math.floor((standaloneExam.timeLimitSeconds || 600) / 60)} min · ${passed
+                        ? `Passed${best !== null ? ` · Best ${best}%` : ""} ✓`
+                        : best !== null && best >= 0
+                          ? `Best score ${best}% — need 50% to unlock`
+                          : "Pass with 50% to unlock the next lecture"}`
+                      : linked.length === 0
                       ? "Exam coming soon — material and video unlock after the exam is published."
                       : passed
                         ? `Exam passed${best !== null ? ` · Best ${best}%` : ""} — material unlocked ✓`
@@ -460,6 +500,15 @@ export default function TeacherContent() {
                         </svg>
                         <span className="journey-lock-tip" role="tooltip">{lockTip}</span>
                       </span>
+                    ) : standalone && standaloneExam && !passed ? (
+                      <button
+                        type="button"
+                        className="btn btn-dark exam-start-btn"
+                        title="Open this standalone exam"
+                        onClick={() => navigate(`/content/teacher/${teacherId}/exams/${standaloneExam.id}`)}
+                      >
+                        Start Exam
+                      </button>
                     ) : (
                       <button
                         type="button"

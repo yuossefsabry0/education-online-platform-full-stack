@@ -64,5 +64,18 @@ module.exports = {
         : teacherRoleOrFn;
     return requireSubAccess(req, res, next);
   },
+  // Admins may view any teacher's content without holding a subscription.
+  // Write actions (exam submit, watch tracking) stay student-gated.
+  requireCoverageOrAdmin: (teacherRoleOrFn) => (req, res, next) => {
+    if (req.user && req.user.userType === "admin") {
+      req.activeRoles = [];
+      return next();
+    }
+    req.roleRequired =
+      typeof teacherRoleOrFn === "function"
+        ? teacherRoleOrFn(req)
+        : teacherRoleOrFn;
+    return requireSubAccess(req, res, next);
+  },
   resolveTeacherFromSubscription,
 };

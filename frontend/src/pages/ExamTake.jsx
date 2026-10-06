@@ -92,6 +92,13 @@ export default function ExamTake() {
       setResult(data.result);
       setShowDetails(false);
       setPhase("result");
+      // Live linkage (additive): a submitted exam changes the profile's exam
+      // performance, averages, certificates and badges — notify listeners.
+      try {
+        window.dispatchEvent(new CustomEvent("edu:learning-stats-updated", { detail: { examId } }));
+      } catch {
+        // non-browser environments (tests) — ignore
+      }
     } catch (err) {
       setError(toApiError(err));
     } finally {

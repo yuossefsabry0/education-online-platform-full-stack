@@ -222,6 +222,7 @@ export const endpoints = {
 
   me: () => get("/user/me"),
   history: (params) => get("/user/history", params),
+  notifications: (params) => get("/user/notifications", params),
 
   subscriptionPlans: (teacherId) => get(`/subscriptions/teacher/${teacherId}`),
   confirmPayment: (body) => post("/subscriptions/confirm-payment", body),
@@ -266,6 +267,7 @@ export const endpoints = {
   adminEditContent: (teacherId, contentId, body) => put(`/admin/teachers/${teacherId}/content/${contentId}`, body),
   adminDeleteContent: (teacherId, contentId) => del(`/admin/teachers/${teacherId}/content/${contentId}`),
   adminLogs: (params) => get("/admin/logs", params),
+  adminBroadcast: (body) => post("/admin/notifications", body),
   adminCancelSubscription: (subscriptionId) => post(`/admin/subscriptions/${subscriptionId}/cancel`, {}),
 };
 
