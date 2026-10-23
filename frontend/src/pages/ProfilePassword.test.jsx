@@ -53,9 +53,9 @@ describe("Profile password change", () => {
     await waitFor(() => {
       expect(screen.getByText("Change password", { selector: "h2" })).toBeInTheDocument();
     });
-    await userEvent.type(screen.getByLabelText(/current password/i), "old12345");
-    await userEvent.type(screen.getByLabelText(/new password/i), "new12345");
-    await userEvent.click(screen.getByRole("button", { name: /^change password$/i }));
+    await userEvent.type(screen.getByLabelText(/^current password$/i), "old12345");
+    await userEvent.type(screen.getByLabelText(/^new password$/i), "new12345");
+    await userEvent.click(screen.getByRole("button", { name: /^update password$/i }));
     await waitFor(() => {
       expect(mockChange).toHaveBeenCalledWith({ currentPassword: "old12345", newPassword: "new12345" });
     });
@@ -73,9 +73,9 @@ describe("Profile password change", () => {
     await waitFor(() => {
       expect(screen.getByText("Change password", { selector: "h2" })).toBeInTheDocument();
     });
-    await userEvent.type(screen.getByLabelText(/current password/i), "bad");
-    await userEvent.type(screen.getByLabelText(/new password/i), "new12345");
-    await userEvent.click(screen.getByRole("button", { name: /^change password$/i }));
+    await userEvent.type(screen.getByLabelText(/^current password$/i), "bad");
+    await userEvent.type(screen.getByLabelText(/^new password$/i), "new12345");
+    await userEvent.click(screen.getByRole("button", { name: /^update password$/i }));
     await waitFor(() => {
       expect(screen.getByText("Wrong")).toBeInTheDocument();
     });

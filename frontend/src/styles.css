@@ -2620,3 +2620,1718 @@ html[data-theme="dark"] .msb-card:hover { border-color: #ffffff; }
   .msb-card, .msb-fill, .msb-tab { transition: none; }
   .msb-card:hover { transform: none; }
 }
+
+/* ---------- profile overview layout refresh (additive) ---------- */
+/* Presentation-only layer for the profile dashboard. Everything here is
+   scoped under .pf-shell / .pf-legacy so no rule can leak into another page,
+   and every value is derived from the stats the page already loads — the
+   data-fetching, stats and password logic above is untouched. */
+.pf-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+}
+.pf-top-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-top: 0.4rem;
+}
+.pf-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #eee0bd;
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(180, 130, 20, 0.10);
+}
+.pf-range-icon {
+  color: #b98218;
+  flex-shrink: 0;
+}
+
+/* KPI row: three stat cards beneath the header (was a right-aligned strip). */
+.pf-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: stretch;
+  padding-top: 0;
+  margin: 0 0 1.25rem;
+}
+.pf-kpi {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.85rem;
+  min-width: 0;
+  background: #fffdf4;
+  border: 1px solid #f0e4c3;
+  border-radius: 20px;
+  padding: 1rem 1.15rem;
+  box-shadow: 0 6px 24px rgba(180, 130, 20, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.pf-kpi:hover {
+  transform: translateY(-2px);
+  border-color: #e3cf9a;
+  box-shadow: 0 12px 32px rgba(180, 130, 20, 0.14);
+}
+.pf-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fde9b8, #f7b733);
+  color: #1a1005;
+}
+.pf-kpi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  text-align: left;
+}
+.pf-kpi-value {
+  font-size: clamp(1.45rem, 2.4vw, 1.9rem);
+}
+
+/* Small status pills used in card heads (badge/certificate counts). */
+.pf-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  background: #e6f5ec;
+  color: #157f3d;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pf-count-pill--soft {
+  background: #fff4d9;
+  color: #8a5a00;
+}
+
+/* Course cards get a slim accent stripe, echoing the reference's media card. */
+.pf-course-card {
+  position: relative;
+  overflow: hidden;
+}
+.pf-course-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 5px;
+  background: linear-gradient(90deg, #f59e0b, #f7b733 55%, #fde9b8);
+}
+
+/* Account card — avatar, identity and the "Edit profile" action. */
+.pf-account {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: #fffdf4;
+  border: 1px solid #f0e4c3;
+  border-radius: 20px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 6px 24px rgba(180, 130, 20, 0.08);
+}
+.pf-account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: linear-gradient(135deg, #111111 0%, #f59e0b 165%);
+}
+.pf-account-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.pf-account-id .account-username { font-size: 1.05rem; }
+.pf-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* Sections inside the legacy account card: one visual block per heading. */
+.pf-legacy {
+  border-radius: 20px;
+  padding: clamp(1rem, 2.5vw, 1.75rem);
+}
+.pf-legacy > h2 {
+  margin: 2rem 0 0.4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 1.15rem;
+}
+.pf-legacy > h2:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.pf-legacy > h3 {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 1.05rem;
+}
+.pf-legacy .stats-grid { margin-top: 0.9rem; }
+.pf-legacy .stat-card {
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+}
+.pf-legacy .stat-card-value { font-size: clamp(1.55rem, 2.8vw, 1.95rem); }
+.pf-legacy .gauge-row { gap: 2.75rem; margin: 1.4rem 0 1rem; }
+
+/* Horizontal lecture-journey timeline (purely presentational). */
+.pf-timeline {
+  list-style: none;
+  margin: 1rem 0 1.25rem;
+  padding: 0.25rem 0 0.5rem;
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  overflow-x: auto;
+}
+.pf-step {
+  position: relative;
+  flex: 1 0 175px;
+  min-width: 175px;
+  padding-top: 2rem;
+}
+.pf-step::before {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  left: 1.55rem;
+  right: -0.75rem;
+  height: 2px;
+  background: #f0e4c3;
+}
+.pf-step:last-child::before { display: none; }
+.pf-step-marker {
+  position: absolute;
+  top: 0;
+  left: 0.6rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--muted);
+  background: #ffffff;
+  border: 2px solid #f0e4c3;
+}
+.pf-step--done .pf-step-marker {
+  color: #1a1005;
+  border-color: #f7b733;
+  background: linear-gradient(135deg, #f59e0b, #f7b733);
+}
+.pf-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  margin-left: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  background: #ffffff;
+  border: 1px solid #eee0bd;
+  border-radius: 14px;
+}
+.pf-step-kind {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b98218;
+}
+.pf-step-title {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf-step-date { font-size: 0.72rem; }
+
+/* Change-password form: two fields side by side, action underneath. */
+.pf-password-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+  max-width: 720px;
+}
+.pf-password-form .field { margin-bottom: 0; }
+.pf-password-form .btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.pf-password-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+html[data-theme="dark"] .pf-range {
+  background: #1e1c15;
+  border-color: #3a3527;
+  color: #ffffff;
+  box-shadow: none;
+}
+html[data-theme="dark"] .pf-range-icon { color: #f5a623; }
+html[data-theme="dark"] .pf-kpi,
+html[data-theme="dark"] .pf-account {
+  background: #161513;
+  border-color: #3a3527;
+  box-shadow: none;
+}
+html[data-theme="dark"] .pf-kpi:hover { border-color: #ffffff; }
+html[data-theme="dark"] .pf-kpi-icon {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #000000;
+}
+html[data-theme="dark"] .pf-count-pill { background: #10241a; color: #4ade80; }
+html[data-theme="dark"] .pf-count-pill--soft { background: #241a08; color: #fbbf24; }
+html[data-theme="dark"] .pf-account-avatar {
+  color: #000000;
+  background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 165%);
+}
+html[data-theme="dark"] .pf-legacy > h2,
+html[data-theme="dark"] .pf-legacy > h3 { border-top-color: #2b2b2b; }
+html[data-theme="dark"] .pf-step::before { background: #3a3527; }
+html[data-theme="dark"] .pf-step-marker {
+  background: #1e1c15;
+  border-color: #3a3527;
+  color: #b3b3b3;
+}
+html[data-theme="dark"] .pf-step--done .pf-step-marker {
+  color: #000000;
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+html[data-theme="dark"] .pf-step-body {
+  background: #161513;
+  border-color: #3a3527;
+}
+html[data-theme="dark"] .pf-step-kind { color: #f5a623; }
+
+@media (max-width: 1000px) {
+  .pf-password-form { grid-template-columns: 1fr; max-width: none; }
+}
+@media (max-width: 900px) {
+  .pf-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .pf-kpis { grid-template-columns: 1fr; }
+  .pf-range { font-size: 0.78rem; padding: 0.45rem 0.8rem; }
+  .pf-account-actions { margin-left: 0; width: 100%; justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-kpi, .pf-range { transition: none; }
+  .pf-kpi:hover { transform: none; }
+}
+
+/* ==========================================================================
+   Profile design refresh (additive, presentation-only)
+   Rebuilds the visual layer of the student profile to match the reference:
+   numbered sections, identity + key-number row, chart card with tooltip
+   bubble + axis, current-course card with "Up next", badge tiles with the
+   next-badge bar, read-only statistics with amber gauges, activity table
+   with filters, and a three-column password form. Every rule is scoped
+   under .pf-* / .pf-shell / .pf-legacy so nothing can leak into pages.
+   All values derive from the stats already loaded in Profile.jsx.
+   ========================================================================== */
+
+/* ---------- section eyebrow labels ---------- */
+.pf-sec-label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.6rem 0 0.85rem;
+}
+.pf-sec-label--head { margin: 0 0 0.35rem; }
+.pf-sec-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #1a1005;
+  background: linear-gradient(135deg, #f7b733, #f59e0b);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.16);
+}
+.pf-sec-label .eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+/* The header label sits inside the title block — hug it to the title. */
+.pf-titleblock .pf-sec-label { margin: 0 0 0.35rem; }
+
+/* ---------- shell + cards surface ---------- */
+html[data-theme="dark"] .pf-shell {
+  background: linear-gradient(180deg, #17130b 0%, #0d0d0c 300px, #0b0b0a 720px);
+  border-color: #262113;
+}
+html[data-theme="dark"] .pf-card,
+html[data-theme="dark"] .pf-kpi,
+html[data-theme="dark"] .pf-account {
+  background: #15130e;
+  border-color: #37311d;
+}
+
+/* ---------- header pills (Live + date range) ---------- */
+.pf-top-side { align-items: center; }
+.pf-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0.42rem 0.3rem 0.42rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+html[data-theme="dark"] .pf-live { background: #1a1712; border-color: #37311d; color: #ffffff; }
+
+/* ---------- identity card inside the KPI row ---------- */
+.pf-kpis {
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 0 0 1.35rem;
+}
+.pf-kpis .pf-account { margin: 0; }
+.pf-account-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pf-account-main .pf-account-actions { margin-left: 0; }
+html[data-theme="dark"] .pf-account-avatar {
+  color: #221604;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+.pf-account-id .account-username { font-weight: 800; }
+.pf-account .role-badge { font-size: 0.62rem; opacity: 0.85; }
+
+/* ---------- key-number cards ---------- */
+.pf-kpi-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  font-size: 1.25rem;
+  color: #b98218;
+  background: rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(245, 166, 35, 0.45);
+}
+html[data-theme="dark"] .pf-kpi-icon {
+  color: #f5a623;
+  background: rgba(245, 166, 35, 0.1);
+}
+.pf-kpi-label {
+  margin-top: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pf-kpi-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.pf-kpi-value {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+@media (max-width: 1200px) {
+  .pf-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .pf-kpis { grid-template-columns: 1fr; }
+  .pf-kpi { align-items: flex-start; }
+}
+
+/* ---------- learning grid layout ---------- */
+.pf-grid--learn {
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  grid-template-areas:
+    "chart course1"
+    "chart course2";
+}
+.pf-grid--learn .pf-chart-card { grid-row: auto; }
+.pf-grid--trophies {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas: "badges certs";
+}
+@media (max-width: 1100px) {
+  .pf-grid--learn {
+    grid-template-columns: 1fr;
+    grid-template-areas: "chart" "course1" "course2";
+  }
+  .pf-grid--trophies {
+    grid-template-columns: 1fr;
+    grid-template-areas: "badges" "certs";
+  }
+}
+
+/* ---------- chart: axis, tooltip bubble, footer chips ---------- */
+.pf-chart-row {
+  display: flex;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+}
+.pf-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 1.15rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 2.2rem;
+}
+.pf-bars { flex: 1 1 auto; margin-top: 0; }
+.pf-bar { position: relative; }
+.pf-bar-tip {
+  position: absolute;
+  top: -1.85rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #221604;
+  border-radius: 8px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+  z-index: 2;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+}
+.pf-bar-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #f5a623;
+  margin-top: -1px;
+}
+.pf-bar--active .pf-bar-fill {
+  box-shadow: 0 0 12px rgba(245, 166, 35, 0.55);
+}
+.pf-bar:hover .pf-bar-fill, .pf-bar--active .pf-bar-fill { filter: none; }
+.pf-bar--active .pf-bar-track { outline: none; }
+.pf-chart-foot {
+  margin-top: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.pf-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.pf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.26rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+.pf-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pf-chip-dot--amber { background: #f5a623; box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.16); }
+.pf-chip-dot--check {
+  width: auto;
+  height: auto;
+  background: none;
+  box-shadow: none;
+  color: #157f3d;
+  font-size: 0.72rem;
+}
+html[data-theme="dark"] .pf-chip { background: #1a1712; border-color: #37311d; color: #ddd6c4; }
+html[data-theme="dark"] .pf-chip-dot--check { color: #4ade80; }
+html[data-theme="dark"] .pf-axis { color: #b3ab99; }
+
+/* ---------- current course card ---------- */
+.pf-course-top { align-items: flex-start; }
+.pf-course-actions { display: inline-flex; gap: 0.4rem; }
+.pf-course-eyebrow { font-size: 0.68rem; letter-spacing: 0.16em; }
+.pf-course-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+.pf-course-progress .pf-progress { margin-top: 0; }
+.pf-next {
+  margin-top: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+html[data-theme="dark"] .pf-next { background: #1a1712; border-color: #37311d; }
+.pf-next-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  color: #1a1005;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+html[data-theme="dark"] .pf-next-icon { color: #000; }
+.pf-next-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pf-next-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b98218;
+}
+html[data-theme="dark"] .pf-next-label { color: #f5a623; }
+.pf-next-text strong {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- shared amber action button ---------- */
+.pf-btn-amber {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border: 1px solid rgba(245, 158, 11, 0.8);
+  color: #221604;
+  border-radius: 999px;
+  padding: 0.5rem 1.05rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.pf-btn-amber:hover:not(:disabled) {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.3);
+}
+.pf-btn-amber:disabled { opacity: 0.6; cursor: not-allowed; }
+.pf-btn-sm-am { padding: 0.35rem 0.85rem; font-size: 0.74rem; }
+html[data-theme="dark"] .pf-btn-amber { color: #000000; }
+
+/* ---------- card subtitles + count pills ---------- */
+.pf-card-sub { margin: 0 0 0.15rem; }
+.pf-count-pill--soft { text-transform: none; letter-spacing: 0.02em; }
+
+/* ---------- badge tiles ---------- */
+.pf-badges-grid { gap: 0.65rem; }
+.pf-badge {
+  gap: 0.35rem;
+  border-radius: 18px;
+  padding: 1rem 0.6rem 0.85rem;
+}
+.pf-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  font-size: 1.45rem;
+  background: rgba(127, 127, 127, 0.1);
+  border: 1px dashed #b9b2a2;
+}
+.pf-badge--earned .pf-badge-icon {
+  background: radial-gradient(circle at 32% 28%, #ffe9a3 0%, #fbbf24 48%, #f59e0b 100%);
+  border: none;
+  box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.16), 0 10px 20px rgba(245, 158, 11, 0.28);
+}
+html[data-theme="dark"] .pf-badge-icon { border-color: #4a4530; }
+html[data-theme="dark"] .pf-badge--earned .pf-badge-icon { box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.18), 0 10px 20px rgba(245, 158, 11, 0.3); }
+.pf-badge-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+  min-height: 1.05rem;
+}
+.pf-badge-state--on {
+  font-size: 0.64rem;
+  font-weight: 800;
+  color: #157f3d;
+  background: rgba(34, 197, 94, 0.13);
+  border-radius: 999px;
+  padding: 0.08rem 0.55rem;
+}
+html[data-theme="dark"] .pf-badge-state--on { color: #4ade80; background: rgba(74, 222, 128, 0.1); }
+.pf-badge-progress {
+  display: inline-block;
+  width: 58px;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(127, 127, 127, 0.22);
+}
+.pf-badge-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+.pf-badge-progress-label { font-size: 0.62rem; }
+
+/* ---------- next-badge footer bar ---------- */
+.pf-next-badge {
+  margin-top: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+html[data-theme="dark"] .pf-next-badge { background: #1a1712; border-color: #37311d; }
+.pf-next-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  border: 1.5px dashed rgba(245, 166, 35, 0.6);
+  background: rgba(245, 166, 35, 0.08);
+}
+.pf-next-badge-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+.pf-next-badge-label {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b98218;
+}
+html[data-theme="dark"] .pf-next-badge-label { color: #f5a623; }
+.pf-next-badge-text strong { font-size: 0.8rem; }
+.pf-next-badge-bar {
+  width: 100%;
+  max-width: 150px;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(127, 127, 127, 0.22);
+}
+.pf-next-badge-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+/* ---------- certificates ---------- */
+.pf-cert { justify-content: flex-start; }
+.pf-cert-dl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+html[data-theme="dark"] .pf-cert-dl { color: #ddd6c4; border-color: #37311d; background: #1a1712; }
+.pf-view-all {
+  margin-top: 0.75rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0.55rem;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.pf-view-all:hover { border-color: #b98218; transform: translateY(-1px); }
+html[data-theme="dark"] .pf-view-all { color: #ffffff; border-color: #37311d; }
+html[data-theme="dark"] .pf-view-all:hover { border-color: #f5a623; }
+
+/* ---------- heading rows + aux pills (legacy card) ---------- */
+.pf-sec-label + .pf-heading-row > h2,
+.pf-sec-label + .pf-heading-row.pf-heading-row--first > h2 {
+  margin-top: 0.4rem;
+  padding-top: 0;
+  border-top: none;
+}
+.pf-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.9rem;
+}
+.pf-heading-row > h2 {
+  flex: 1 1 auto;
+  margin: 0.6rem 0 0;
+  padding-top: 1.3rem;
+  border-top: 1px solid var(--border);
+  font-size: 1.15rem;
+}
+.pf-heading-row--first { margin-top: 0; }
+.pf-heading-row--first > h2 {
+  margin-top: 0.7rem;
+  padding-top: 0;
+  border-top: none;
+}
+.pf-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+.pf-readonly-icon { color: #f5a623; }
+html[data-theme="dark"] .pf-readonly { background: #1a1712; border-color: #37311d; color: #b3ab99; }
+.pf-key-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #b98218;
+  border: 1px solid rgba(245, 166, 35, 0.45);
+  background: rgba(245, 166, 35, 0.08);
+}
+html[data-theme="dark"] .pf-key-badge { color: #f5a623; }
+
+/* ---------- subscription cards ---------- */
+.teacher-sub-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.pf-pill-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #157f3d;
+  background: #e6f5ec;
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  white-space: nowrap;
+}
+html[data-theme="dark"] .pf-pill-ok { color: #4ade80; background: #12281a; }
+@media (max-width: 760px) {
+  .teacher-sub-card { flex-wrap: wrap; }
+  .teacher-sub-actions { margin-left: 0; }
+}
+
+/* ---------- statistics cards with mini icons ---------- */
+.pf-sicon {
+  display: inline-flex;
+  color: #b98218;
+  margin-bottom: 0.1rem;
+}
+html[data-theme="dark"] .pf-sicon { color: #f5a623; }
+
+/* ---------- gauges (amber ring, design accents) ---------- */
+.pf-legacy .gauge-row { justify-content: flex-start; }
+.gauge-center strong { letter-spacing: -0.01em; }
+html[data-theme="dark"] .gauge-track { stroke: #2a2720; }
+html[data-theme="dark"] .gauge-fill { stroke: #f5a623; }
+
+/* ---------- lecture journey ---------- */
+.pf-step { flex: 1 0 180px; min-width: 180px; }
+.pf-step::before { top: 17px; }
+.pf-step-marker {
+  width: 36px;
+  height: 36px;
+  top: 0;
+  left: 0.2rem;
+  font-size: 0.9rem;
+}
+.pf-step--done .pf-step-marker { box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.16), 0 6px 14px rgba(245, 158, 11, 0.22); }
+.pf-step-body {
+  margin-left: 0.2rem;
+  padding: 0.7rem 0 0;
+  background: none;
+  border: none;
+}
+.pf-step-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #157f3d;
+  background: rgba(34, 197, 94, 0.13);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  width: fit-content;
+}
+html[data-theme="dark"] .pf-step-pill { color: #4ade80; background: rgba(74, 222, 128, 0.1); }
+.pf-step:not(.pf-step--done) .pf-step-pill {
+  color: #8a5a00;
+  background: rgba(245, 166, 35, 0.14);
+}
+html[data-theme="dark"] .pf-step:not(.pf-step--done) .pf-step-pill { color: #fbbf24; background: rgba(245, 166, 35, 0.1); }
+.pf-step-kind { margin-top: 0.25rem; }
+.pf-journey-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.3rem 0 0.6rem;
+}
+.pf-jtabs {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+html[data-theme="dark"] .pf-jtabs { background: #1a1712; border-color: #37311d; }
+.pf-jtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.28rem 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.2s ease;
+}
+.pf-jtab:hover { color: var(--text); }
+.pf-jtab--active { background: #111111; color: #ffffff; }
+html[data-theme="dark"] .pf-jtab--active { background: #ffffff; color: #000000; }
+.pf-jtab-count {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.04rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.2);
+}
+.pf-journey-showing { white-space: nowrap; }
+
+/* journey activity table */
+.pf-legacy .table-wrap { border-radius: 16px; }
+.pf-legacy .data-table th,
+.pf-legacy .data-table td { padding: 0.72rem 0.9rem; vertical-align: middle; }
+.pf-legacy .data-table thead th {
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+html[data-theme="dark"] .pf-legacy .data-table thead th { color: #b3ab99; }
+.pf-act-cell { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; max-width: 100%; }
+.pf-act-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 0.14rem 0.6rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.pf-act-pill--exam { color: #b98218; background: rgba(245, 166, 35, 0.16); }
+html[data-theme="dark"] .pf-act-pill--exam { color: #fbbf24; background: rgba(245, 166, 35, 0.14); }
+.pf-act-pill--watch { color: var(--muted); background: rgba(127, 127, 127, 0.16); }
+html[data-theme="dark"] .pf-act-pill--watch { color: #ddd6c4; background: rgba(221, 214, 196, 0.09); }
+.pf-act-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-score-cell { display: inline-flex; flex-direction: column; gap: 0.28rem; }
+.pf-score-cell strong { font-size: 0.85rem; }
+.pf-score-bar {
+  display: block;
+  width: 120px;
+  max-width: 26vw;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(127, 127, 127, 0.22);
+}
+.pf-score-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+.pf-legacy .data-table tbody tr:hover { background: rgba(245, 166, 35, 0.05); }
+.pf-date-cell { display: inline-flex; align-items: center; gap: 0.55rem; white-space: nowrap; }
+.pf-row-ok { color: #1a7f3d; display: inline-flex; }
+.pf-row-ok--muted { color: rgba(127, 127, 127, 0.5); }
+html[data-theme="dark"] .pf-row-ok { color: #4ade80; }
+
+/* ---------- change password ---------- */
+.pf-pw-subtitle { margin-bottom: 0.4rem; }
+.pf-password-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 0.9rem;
+  align-items: end;
+  max-width: none;
+  margin-top: 0.6rem;
+}
+.pf-password-form > .btn {
+  grid-column: auto;
+  justify-self: stretch;
+  align-self: end;
+  margin-bottom: 0.1rem;
+}
+.pf-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.pf-input-icon {
+  position: absolute;
+  left: 0.65rem;
+  display: inline-flex;
+  color: var(--muted);
+  pointer-events: none;
+}
+.pf-input input {
+  width: 100%;
+  padding: 0.58rem 2.5rem 0.58rem 2.15rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.pf-input input:focus {
+  outline: none;
+  border-color: #f5a623;
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.16);
+}
+html[data-theme="dark"] .pf-input input { background: #1a1712; border-color: #37311d; color: #ffffff; }
+html[data-theme="dark"] .pf-input input:focus { border-color: #f5a623; }
+.pf-eye {
+  position: absolute;
+  right: 0.5rem;
+  display: inline-flex;
+  padding: 0.22rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.pf-eye:hover { color: var(--text); }
+html[data-theme="dark"] .pf-eye:hover { color: #ffffff; }
+.pf-strength { display: flex; gap: 0.3rem; margin-top: 0.45rem; }
+.pf-strength-seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.25);
+  transition: background 0.2s ease;
+}
+.pf-strength-seg.pf-strength-on {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+.pf-pw-note {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.95rem;
+  font-size: 0.82rem;
+  color: #157f3d;
+  background: rgba(34, 197, 94, 0.09);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+}
+.pf-pw-note-icon { display: inline-flex; flex-shrink: 0; }
+html[data-theme="dark"] .pf-pw-note { color: #4ade80; background: rgba(74, 222, 128, 0.08); border-color: rgba(74, 222, 128, 0.28); }
+@media (max-width: 1000px) {
+  .pf-password-form { grid-template-columns: 1fr; }
+  .pf-password-form > .btn { justify-self: start; }
+}
+
+/* ---------- reduced motion for the refresh layer ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .pf-btn-amber, .pf-eye, .pf-view-all, .pf-jtab, .pf-strength-seg,
+  .pf-bar-tip, .pf-cert, .pf-badge, .pf-badges-grid .pf-badge { transition: none; }
+  .pf-btn-amber:hover:not(:disabled), .pf-view-all:hover, .pf-badge:hover { transform: none; }
+}
+
+
+/* ============================================================ */
+/* ============ PROFILE: design match pass 2 (additive) ======= */
+/* ============================================================ */
+
+/* ---------- amber eyebrows (all 6 section labels + card eyebrows) ---------- */
+.pf-eyebrow,
+.pf-sec-label .eyebrow {
+  color: #b98218;
+}
+html[data-theme="dark"] .pf-eyebrow,
+html[data-theme="dark"] .pf-sec-label .eyebrow {
+  color: #f5a623;
+}
+
+/* ---------- stacked section panels (4, 5, 6 are separate cards now) ---------- */
+.pf-legacy + .pf-sec-label { margin-top: 1.6rem; }
+
+/* ---------- header: plain live text + bordered refresh pill ---------- */
+.pf-live {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+.pf-live-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.35rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+/* ---------- identity card: button under the name line ---------- */
+.pf-kpis .pf-account {
+  padding: 0.9rem 1rem;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.pf-account-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+
+/* ---------- KPI number cards: vertical icon-top layout ---------- */
+.pf-kpi {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0.95rem 1rem;
+}
+.pf-kpi-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 1.15rem;
+}
+.pf-kpi-value {
+  margin-top: 0.55rem;
+  font-size: clamp(1.55rem, 2.2vw, 1.9rem);
+  line-height: 1.05;
+}
+.pf-kpi-unit {
+  margin-left: 0.15rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.pf-kpi-value .pf-kpi-unit { line-height: 1; }
+
+/* ---------- chart card: subtitle, legend row, total on the right ---------- */
+.pf-chart-sub { margin: 0.15rem 0 0; }
+.pf-chart-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.85rem 0 0.4rem;
+}
+.pf-chart-top .pf-legend { margin: 0; }
+.pf-chart-total {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.pf-chart-live { text-align: right; font-size: 0.68rem; }
+
+/* ---------- subscriptions strip: neutral dark avatar square ---------- */
+.teacher-sub-card .brand-mark {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  font-size: 1rem;
+  color: #ffffff;
+  background: #161513;
+  border: none;
+}
+
+/* ---------- stats band: 2x2 grid + gauge column ---------- */
+.pf-stats-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: stretch;
+  margin-top: 0.9rem;
+}
+.pf-stats-band-left .stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  height: 100%;
+}
+.pf-stats-band-right {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.6rem 0.8rem;
+  background: rgba(255, 255, 255, 0.35);
+}
+.pf-stats-band-right .gauge-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.4rem;
+  margin: 0;
+}
+html[data-theme="dark"] .pf-stats-band-right { background: #14120d; border-color: #37311d; }
+@media (max-width: 1100px) {
+  .pf-stats-band { grid-template-columns: 1fr; }
+}
+
+/* ---------- stat cards: icon-left + uppercase label on one row ---------- */
+.pf-stat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.pf-sicon {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #b98218;
+  background: rgba(245, 166, 35, 0.1);
+  border: 1px solid rgba(245, 166, 35, 0.4);
+}
+html[data-theme="dark"] .pf-sicon { color: #f5a623; }
+.stat-card-label {
+  font-size: 0.62rem !important;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-card .stat-card-value { font-size: 1.5rem; }
+
+/* ---------- amber soft pill ("Excellent") ---------- */
+.pf-pill-am {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #8a5a00;
+  background: rgba(245, 166, 35, 0.16);
+}
+html[data-theme="dark"] .pf-pill-am { color: #fbbf24; background: rgba(245, 166, 35, 0.12); }
+
+/* ---------- gauges: thicker ring, bigger numbers ---------- */
+.gauge-track { stroke-width: 13; }
+.gauge-fill { stroke-width: 13; }
+.gauge-center strong { font-size: 1.4rem; }
+html[data-theme="dark"] .gauge-track { stroke: #2a2618; }
+html[data-theme="dark"] .gauge-center strong { color: #ffffff; }
+
+/* ---------- badge tiles: inset panels, amber states (no green) ---------- */
+.pf-badges-grid .pf-badge {
+  border-radius: 16px;
+  padding: 1rem 0.7rem 0.95rem;
+  align-items: center;
+  gap: 0.4rem;
+}
+.pf-badges-grid .pf-badge-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #b98218;
+  background: radial-gradient(circle at 50% 40%, rgba(247, 183, 51, 0.28), rgba(245, 166, 35, 0.08));
+  border: 1px solid rgba(245, 166, 35, 0.45);
+  box-shadow: 0 0 0 5px rgba(245, 166, 35, 0.08);
+}
+.pf-badge--locked .pf-badge-icon {
+  color: var(--muted);
+  background: rgba(125, 125, 125, 0.08);
+  border: 1px dashed var(--border);
+  box-shadow: none;
+}
+html[data-theme="dark"] .pf-badge-icon { color: #f5a623; }
+html[data-theme="dark"] .pf-badge--locked .pf-badge-icon { color: #b1a98f; background: rgba(30, 28, 21, 0.8); }
+.pf-badge-state--on {
+  color: #8a5a00;
+  background: rgba(245, 166, 35, 0.16);
+}
+html[data-theme="dark"] .pf-badge-state--on { color: #fbbf24; background: rgba(245, 166, 35, 0.12); }
+.pf-next-badge .pf-next-badge-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  color: #1a1005;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border: none;
+  box-shadow: 0 0 0 5px rgba(245, 166, 35, 0.14);
+}
+.pf-next-badge { align-items: center; }
+.pf-next-badge-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b98218;
+}
+html[data-theme="dark"] .pf-next-badge-label { color: #f5a623; }
+
+/* ---------- certificates: flat rows with hairline dividers ---------- */
+.pf-certs-list li { border-bottom: 1px solid var(--border); }
+.pf-certs-list li:last-child { border-bottom: none; }
+.pf-cert {
+  width: 100%;
+  padding: 0.6rem 0.2rem;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  border-radius: 0;
+}
+.pf-cert:hover { opacity: 0.85; }
+.pf-cert-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 11px;
+  color: #b98218;
+  background: rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(245, 166, 35, 0.4);
+}
+html[data-theme="dark"] .pf-cert-icon { color: #f5a623; }
+.pf-cert-dl {
+  border: 0 !important;
+  background: none !important;
+  color: #b98218;
+}
+html[data-theme="dark"] .pf-cert-dl { color: #f5a623; }
+.pf-view-all { border-style: solid; }
+
+/* ---------- lecture journey: centered step text, amber rails ---------- */
+.pf-timeline { align-items: flex-start; }
+.pf-step-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.3rem;
+}
+.pf-step--done::before { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.pf-step:not(.pf-step--done)::before { opacity: 0.55; }
+
+/* ---------- journey activity pills with mini icons ---------- */
+.pf-act-pill { display: inline-flex; align-items: center; gap: 0.3rem; }
+.pf-act-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+}
+/* ---------- journey table score bar slim ---------- */
+.pf-score-bar {
+  height: 4px;
+  min-width: 90px;
+  border-radius: 999px;
+}
+/* ---------- strength meter narrower (matches the mock) ---------- */
+.pf-strength { max-width: 62%; }
+
+/* ============================================================ */
+/* ============ PROFILE: design match pass 3 (additive) ======= */
+/* ============================================================ */
+
+/* The identity card's old horizontal layout used `flex: 1 1 220px` on the
+   name block; in a column flex that basis becomes vertical height and
+   stretched every card in the row. Neutralise it and put the avatar back
+   beside the name, with "Edit profile" right under the text. */
+.pf-kpis { align-items: stretch; }
+.pf-kpis .pf-account {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+.pf-kpis .pf-account .pf-account-id {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.pf-kpis .pf-account .pf-account-main { justify-content: flex-start; }
+.pf-kpis .pf-account .pf-account-actions {
+  margin: 0.35rem 0 0;
+  flex-wrap: nowrap;
+}
+
+/* Live text stays borderless even in the dark theme (a dark-theme rule
+   further up was re-adding the pill background). */
+.pf-live {
+  background: none;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+html[data-theme="dark"] .pf-live {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* The reporting-period pill is not part of the approved design header. */
+.pf-range { display: none; }
+
+/* Section labels removed — keep the stacked panels separated. */
+.form-card.pf-legacy + .form-card.pf-legacy { margin-top: 1.1rem; }
+
+/* ============================================================ */
+/* ============ PROFILE: design match pass 4 (additive) ======= */
+/* ============================================================ */
+
+/* Earned badge discs become solid amber with a dark glyph silhouette,
+   exactly like the mock (dark icon on an amber circle). */
+.pf-badges-grid .pf-badge--earned .pf-badge-icon {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border: none;
+  box-shadow: 0 0 0 5px rgba(245, 166, 35, 0.14), 0 6px 16px rgba(245, 158, 11, 0.25);
+}
+.pf-badge-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: grayscale(1) brightness(0);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.pf-next-badge .pf-badge-glyph { font-size: 1.05rem; }
+
+/* Locked tiles keep the dashed dark disc + lock glyph. */
+.pf-badges-grid .pf-badge--locked .pf-badge-icon { border-style: dashed; }
+
+/* Compact tiles (the render was too airy vs the mock). */
+.pf-badges-grid { gap: 0.65rem; }
+.pf-badges-grid .pf-badge { gap: 0.3rem; padding: 0.9rem 0.55rem 0.8rem; }
+.pf-badges-grid .pf-badge-icon { width: 48px; height: 48px; font-size: 1.3rem; }
+.pf-badge-title { font-size: 0.78rem; }
+.pf-badge-hint { font-size: 0.66rem; }
+
+/* Locked state row: "Progress  ▬▬  3 / 5" on one line. */
+.pf-badge-state { display: inline-flex; align-items: center; gap: 0.35rem; }
+.pf-badge-state .pf-badge-progress-label { font-size: 0.6rem; }
+.pf-badge-progress { width: 52px; min-width: 52px; }
+.pf-badge-progress-label { font-size: 0.6rem; margin: 0 !important; }
+
+/* Next-badge strip: compact, bar hugs the text underneath. */
+.pf-next-badge {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.75rem;
+}
+.pf-next-badge .pf-next-badge-icon { width: 40px; height: 40px; flex-shrink: 0; }
+.pf-next-badge-text { gap: 0.12rem; }
+.pf-next-badge-bar {
+  width: min(100%, 170px);
+  min-width: 90px;
+  height: 4px;
+  margin-top: 0.18rem;
+}
+
+/* Certificates: flat compact rows, dividers, tight paddings. */
+.pf-certs-list { gap: 0; margin: 0.35rem 0 0; }
+.pf-cert { padding: 0.48rem 0.25rem; gap: 0.6rem; }
+.pf-cert-icon {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 9px;
+}
+.pf-cert-text strong { font-size: 0.8rem; }
+.pf-cert-text .muted.small { font-size: 0.66rem; margin-top: 0.05rem; }
+.pf-certs-card .pf-card-sub { margin-bottom: 0.35rem; }
+
+/* ============================================================ */
+/* ============ PROFILE: design match pass 5 (additive) ======= */
+/* ============================================================ */
+
+/* Compact learning-statistics band (the rendered version was far too airy). */
+.pf-stats-band { margin-top: 0.7rem; gap: 0.7rem; }
+.pf-stats-band-left .stats-grid { gap: 0.6rem; }
+.pf-stats-band-left .stat-card {
+  padding: 0.7rem 0.85rem;
+  gap: 0.25rem;
+}
+.pf-sicon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 8px;
+}
+.pf-stats-band-left .stat-card .stat-card-value { font-size: 1.35rem; }
+.pf-stats-band-left .stat-card .muted.small { font-size: 0.68rem; }
+
+/* Gauge panel: tighter padding + tighter spacing between rings. */
+.pf-stats-band-right { padding: 0.5rem 0.6rem; }
+.pf-stats-band-right .gauge-row { gap: 1.5rem; }
+.gauge-center strong { font-size: 1.3rem; }
+.gauge-label { font-size: 0.8rem; margin-top: 0.25rem; }
+
+/* ============================================================ */
+/* ============ PROFILE: design match pass 6 (additive) ======= */
+/* ============================================================ */
+
+/* Stepper: small nodes with plain centered text underneath (no boxes). */
+.pf-timeline { margin: 0.55rem 0 0.35rem; gap: 0.4rem; padding: 0 0 0.2rem; }
+.pf-step { padding-top: 1.6rem; }
+.pf-step::before {
+  top: 12px;
+  left: calc(50% + 15px);
+  right: -50%;
+}
+.pf-step-marker {
+  width: 26px;
+  height: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+}
+.pf-step--done .pf-step-marker {
+  box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.1);
+}
+.pf-step-body {
+  padding: 0.55rem 0.15rem 0;
+  background: none;
+  border: none;
+  transform: none;
+  gap: 0.18rem;
+}
+html[data-theme="dark"] .pf-step-body { background: none; border: none; }
+.pf-step-title { font-size: 0.74rem; }
+.pf-step-date { font-size: 0.62rem; }
+.pf-step-pill { font-size: 0.56rem; padding: 0.08rem 0.5rem; }
+
+/* Tabs row compact. */
+.pf-jtabs { padding: 0.2rem; gap: 0.25rem; }
+.pf-jtab { font-size: 0.68rem; padding: 0.22rem 0.65rem; }
+.pf-jtab-count { font-size: 0.58rem; }
+.pf-journey-showing { font-size: 0.66rem !important; }
+
+/* Journey table: compact rows, inline score bar, subtle header strip. */
+.pf-legacy .data-table caption { display: none; }
+.pf-legacy .data-table thead th {
+  font-size: 0.62rem;
+  padding: 0.5rem 0.6rem;
+}
+html[data-theme="dark"] .pf-legacy .data-table thead th { background: #17150f; }
+.pf-legacy .data-table tbody td {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.72rem;
+}
+.pf-act-pill { font-size: 0.58rem; padding: 0.14rem 0.5rem; }
+.pf-score-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pf-score-cell strong { font-size: 0.75rem; }
+.pf-score-bar {
+  display: inline-block;
+  width: 64px;
+  min-width: 64px;
+  height: 5px;
+}
+.pf-date-cell { gap: 0.7rem; }
+.pf-row-ok { font-size: 0.85rem; }
+.pf-act-title { font-size: 0.75rem; }
+
+/* ============================================================ */
+/* ============ PROFILE: design match pass 7 (additive) ======= */
+/* ============================================================ */
+
+/* Password panel: labels share one baseline, compact inputs. */
+.pf-legacy .pf-heading-row > h2 { font-size: 1.05rem; }
+.pf-pw-subtitle { font-size: 0.68rem !important; margin-bottom: 0.3rem; }
+.pf-password-form { gap: 0.6rem; margin-top: 0.5rem; align-items: start; }
+.pf-password-form > .btn {
+  align-self: center;
+  justify-self: stretch;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.pf-password-form .field > span:first-child { font-size: 0.72rem; }
+.pf-input input {
+  padding: 0.42rem 2.4rem 0.42rem 2rem;
+  font-size: 0.8rem;
+}
+.pf-input-icon { left: 0.6rem; }
+.pf-strength { margin-top: 0.32rem; gap: 0.25rem; }
+.pf-strength-seg { height: 4px; }
+
+/* Key badge: just the small amber key glyph, no box. */
+.pf-key-badge {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: auto;
+  height: auto;
+}
+
+/* Security note strip: one compact line. */
+.pf-pw-note {
+  margin: 0.6rem 0 0;
+  padding: 0.45rem 0.65rem;
+  gap: 0.45rem;
+  font-size: 0.66rem;
+  border-radius: 10px;
+}
+.pf-pw-note-icon { transform: scale(0.8); transform-origin: center left; }
+
